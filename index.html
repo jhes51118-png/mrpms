@@ -167,7 +167,7 @@
         const STATUS_OPTIONS = [
             { value: 'NEW', label: '新進案件', color: 'bg-gray-100 text-gray-800' },
             { value: 'ASSIGNED', label: '已指派', color: 'bg-blue-100 text-blue-800' },
-            { value: 'REPAIRING', label: '改機中', color: 'bg-purple-100 text-purple-800' }, // 修改狀態名稱
+            { value: 'REPAIRING', label: '改機中', color: 'bg-purple-100 text-purple-800' }, 
             { value: 'READY', label: '待領回', color: 'bg-emerald-100 text-emerald-800' },
             { value: 'CLOSED', label: '已結案', color: 'bg-green-100 text-green-800' },
         ];
@@ -266,7 +266,6 @@
             const [statusFilter, setStatusFilter] = useState('UNFINISHED'); 
             const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' }); 
             
-            // 預設角色改為 PUBLIC
             const [currentUserRole, setCurrentUserRole] = useState('PUBLIC'); 
             const [currentTechName, setCurrentTechName] = useState(''); 
             const [currentTechUsername, setCurrentTechUsername] = useState(''); 
@@ -353,7 +352,6 @@
                 e.preventDefault();
                 const { username, password } = loginForm;
                 
-                // Admin Hardcoded Login
                 if (username === '25619' && password === '25619') {
                     setCurrentUserRole('ADMIN');
                     setCurrentTechName('Admin');
@@ -363,7 +361,6 @@
                     return;
                 }
 
-                // Engineer Login Check
                 const tech = technicians.find(t => t.username === username && t.password === password);
                 if (tech) {
                     setCurrentUserRole('ENGINEER');
@@ -396,7 +393,39 @@
             const handleChangePassword = (e) => { /* ... existing password logic ... */ };
             const handleOpenDetail = (order) => { const isStandardDept = DEPARTMENTS.includes(order.source_dept); setEditForm({ ...order, source_dept: isStandardDept ? order.source_dept : 'Other', custom_source_dept: isStandardDept ? '' : order.source_dept }); setIsDetailModalOpen(true); };
             const handleEditFormChange = (e) => { const { name, value } = e.target; setEditForm(prev => ({ ...prev, [name]: value })); };
-            const handleUpdateOrder = async () => { /* ... existing update logic ... */ };
+
+            // 修正 1: 更新工單功能 (確保 updateData 正確定義)
+            const handleUpdateOrder = async () => {
+                if (!editForm) return;
+                const finalSourceDept = editForm.source_dept === 'Other' 
+                    ? (editForm.custom_source_dept || 'Other') 
+                    : editForm.source_dept;
+
+                const updateData = {
+                    source_dept: finalSourceDept, 
+                    status: editForm.status,
+                    current_owner: editForm.current_owner,
+                    eta_date: editForm.eta_date,
+                    priority: editForm.priority, 
+                    maintenance_note: editForm.maintenance_note || ''
+                };
+
+                if (isFirebaseEnabled && db) {
+                    try {
+                        const orderRef = doc(db, "work_orders", editForm.id);
+                        await updateDoc(orderRef, updateData);
+                        showToast("工單更新成功！");
+                        setIsDetailModalOpen(false);
+                    } catch (error) {
+                        showToast("更新失敗: " + error.message, "error");
+                    }
+                } else {
+                    setOrders(prev => prev.map(o => o.id === editForm.id ? {...editForm, ...updateData} : o));
+                    showToast("更新成功 (模擬模式)");
+                    setIsDetailModalOpen(false);
+                }
+            };
+
             const handleSelfAssign = () => { if (!editForm || currentUserRole !== 'ENGINEER') return; setEditForm(prev => ({ ...prev, current_owner: currentTechName, status: 'ASSIGNED' })); showToast(`已將負責人設為：${currentTechName}，請記得點擊儲存。`); };
             const handleDeleteOrder = async () => { /* ... existing delete logic ... */ };
             const handlePrintOrder = () => window.print();
@@ -474,9 +503,8 @@
             const handleAddTechnician = () => { /* ... existing logic ... */ };
             const handleDeleteTechnician = (username) => { /* ... existing logic ... */ };
             
-            // 修改: GUEST 模式不允許切換 Tab
             const handleKPIClick = (filterType) => { 
-                if (currentUserRole === 'GUEST') return; // GUEST cannot navigate
+                if (currentUserRole === 'GUEST') return; 
                 setActiveTab('list'); 
                 setStatusFilter(filterType); 
             };
@@ -517,7 +545,7 @@
                                 <Settings className="w-8 h-8 text-blue-400" />
                                 <div><h1 className="text-xl font-bold tracking-tight">MRPMS 改機申請平台</h1><p className="text-xs text-slate-400">前台填單專用 (Kiosk)</p></div>
                             </div>
-                            {/* 修改 2: 點擊後進入 GUEST 訪客模式，不跳登入 */}
+                            {/* 修正 3: 將此按鈕行為改為直接進入 GUEST 模式，而非開啟登入視窗 */}
                             <button onClick={() => setCurrentUserRole('GUEST')} className="flex items-center text-slate-300 hover:text-white text-xs px-3 py-1 border border-slate-700 rounded transition-colors bg-slate-800">
                                 <LogIn className="w-4 h-4 mr-1" /> 後台管理
                             </button>
@@ -691,7 +719,7 @@
                                 </div>
                             </div>
                             
-                            {/* Login Button for Guest, Logout for others */}
+                            {/* 修正 2: 訪客模式顯示「登入系統」按鈕並正確觸發 */}
                             {currentUserRole === 'GUEST' ? (
                                 <button onClick={() => setIsLoginModalOpen(true)} className="flex items-center justify-center w-full py-2 text-xs text-white bg-slate-700 hover:bg-slate-600 rounded transition-colors mb-2">
                                     <LogIn className="w-3 h-3 mr-1" /> 登入系統
