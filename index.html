@@ -81,7 +81,7 @@
             Clock, CheckCircle2, AlertCircle, X, History, Truck, Database, CloudOff, Save,
             UserCog, ChevronDown, Trash2, Shield, Flame, LogOut, ClipboardList, MessageSquare,
             Download, Upload, ArrowUpDown, Printer, FileClock, Users, MinusCircle, LogIn, Lock,
-            UserPlus, KeyRound, Hand, ClipboardCheck, RefreshCcw, Wifi, WifiOff, Copy
+            UserPlus, KeyRound, Hand, ClipboardCheck, RefreshCcw, Wifi, WifiOff, Copy, Eye
         } from 'lucide-react';
         
         import { 
@@ -162,7 +162,8 @@
         // ==========================================
         //  常數定義
         // ==========================================
-        const DEPARTMENTS = ['EE', 'PPM', 'ME', 'SID', 'RF', 'EMI', 'CSC', 'Other']; 
+        // 修改 1: 新增 Thermal
+        const DEPARTMENTS = ['EE', 'PPM', 'ME', 'SID', 'RF', 'EMI', 'CSC', 'Thermal', 'Other']; 
         
         const STATUS_OPTIONS = [
             { value: 'NEW', label: '新進案件', color: 'bg-gray-100 text-gray-800' },
@@ -316,7 +317,7 @@
                 eta_date: '', 
                 priority: 'NORMAL',
                 maintenance_note: '',
-                quantity: 1 // 修改 1: 新增數量 State，預設為 1
+                quantity: 1 
             });
 
             const showToast = (message, type = 'success') => {
@@ -348,22 +349,43 @@
                 }
             }, []);
 
-            // ... (省略未變動的 Handler 以節省篇幅) ...
+            // 登入處理函式
             const handleLogin = (e) => {
                 e.preventDefault();
                 const { username, password } = loginForm;
+                
+                // Admin Hardcoded Login
                 if (username === '25619' && password === '25619') {
-                    setCurrentUserRole('ADMIN'); setCurrentTechName('Admin'); setIsLoginModalOpen(false); showToast("登入成功：最高權限管理者"); setLoginForm({ username: '', password: '' }); return;
+                    setCurrentUserRole('ADMIN');
+                    setCurrentTechName('Admin');
+                    setIsLoginModalOpen(false);
+                    showToast("登入成功：最高權限管理者");
+                    setLoginForm({ username: '', password: '' });
+                    return;
                 }
+
+                // Engineer Login Check
                 const tech = technicians.find(t => t.username === username && t.password === password);
                 if (tech) {
-                    setCurrentUserRole('ENGINEER'); setCurrentTechName(tech.name); setCurrentTechUsername(tech.username); setIsLoginModalOpen(false); showToast(`登入成功：${tech.name}`);
+                    setCurrentUserRole('ENGINEER');
+                    setCurrentTechName(tech.name); 
+                    setCurrentTechUsername(tech.username);
+                    setIsLoginModalOpen(false);
+                    showToast(`登入成功：${tech.name}`);
                 } else {
                     showToast("帳號或密碼錯誤", "error");
                 }
                 setLoginForm({ username: '', password: '' });
             };
-            const handleLogout = () => { setCurrentUserRole('PUBLIC'); setCurrentTechName(''); setCurrentTechUsername(''); setActiveTab('dashboard'); showToast("已登出"); };
+
+            const handleLogout = () => {
+                setCurrentUserRole('PUBLIC');
+                setCurrentTechName('');
+                setCurrentTechUsername('');
+                setActiveTab('dashboard');
+                showToast("已登出");
+            };
+
             const handleSystemBackup = () => {
                 const techRows = technicians.map(t => `TECH,${escapeCsv(t.name)},${escapeCsv(t.username)},${escapeCsv(t.password)}`);
                 const orderRows = orders.map(o => `ORDER,${escapeCsv(o.id)},${escapeCsv(o.case_no)},${escapeCsv(o.source_dept)},${escapeCsv(o.requester_name)},${escapeCsv(o.extension)},${escapeCsv(o.machine_serial)},${escapeCsv(o.machine_model)},${escapeCsv(o.issue_description)},${escapeCsv(o.requester_eta_date)},${escapeCsv(o.eta_date)},${escapeCsv(o.priority)},${escapeCsv(o.maintenance_note)},${escapeCsv(o.inbound_date)},${escapeCsv(o.status)},${escapeCsv(o.current_owner)},${escapeCsv(o.is_overdue)},${escapeCsv(o.created_at)}`);
@@ -383,7 +405,6 @@
             const handleExportCSV = () => { /* ... existing export logic ... */ };
             const handleAddFormChange = (e) => { const { name, value } = e.target; setNewOrderForm(prev => ({ ...prev, [name]: value })); };
 
-            // 修改 1: 批量新增工單 Handler
             const handleSubmitNewOrder = async (e) => {
                 e.preventDefault();
                 if (!newOrderForm.requester_name.trim()) { showToast("請填寫送件人姓名", "error"); return; }
@@ -399,7 +420,6 @@
 
                 for (let i = 0; i < qty; i++) {
                     const uniqueSuffix = qty > 1 ? `-${i + 1}` : '';
-                    // 為了避免時間戳完全相同導致 ID 衝突，這裡微調時間
                     const createdTime = new Date(timestamp + i).toISOString(); 
                     
                     const newOrderData = {
@@ -492,10 +512,10 @@
                         <header className="bg-slate-900 text-white p-4 shadow-md flex justify-between items-center">
                              <div className="flex items-center gap-2">
                                 <Settings className="w-8 h-8 text-blue-400" />
-                                {/* 修改 2 & 3: 標題改為 改機申請 */}
                                 <div><h1 className="text-xl font-bold tracking-tight">MRPMS 改機申請平台</h1><p className="text-xs text-slate-400">前台填單專用 (Kiosk)</p></div>
                             </div>
-                            <button onClick={() => setIsLoginModalOpen(true)} className="flex items-center text-slate-300 hover:text-white text-xs px-3 py-1 border border-slate-700 rounded transition-colors bg-slate-800">
+                            {/* 修改 2: 點擊後進入 GUEST 訪客模式，不跳登入 */}
+                            <button onClick={() => setCurrentUserRole('GUEST')} className="flex items-center text-slate-300 hover:text-white text-xs px-3 py-1 border border-slate-700 rounded transition-colors bg-slate-800">
                                 <LogIn className="w-4 h-4 mr-1" /> 後台管理
                             </button>
                         </header>
@@ -504,7 +524,6 @@
                             {/* 填單區塊 */}
                             <div className="bg-white p-10 rounded-2xl shadow-xl border border-gray-100 max-w-lg w-full">
                                 <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6"><ClipboardList className="w-10 h-10" /></div>
-                                {/* 修改 2: 卡片標題改為 改機申請 */}
                                 <h2 className="text-3xl font-bold text-gray-800 mb-2">機台改機申請</h2>
                                 <p className="text-gray-500 mb-8">請點擊下方按鈕填寫新的改機工單。填寫完畢後，系統將自動通知技術人員。</p>
                                 <button onClick={() => setIsAddModalOpen(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold py-4 rounded-xl shadow-lg transform hover:scale-105 transition-all flex items-center justify-center"><Plus className="w-6 h-6 mr-2" /> 填寫改機單</button>
@@ -517,7 +536,6 @@
 
                             <div className="text-xs text-slate-400 mt-8 flex items-center justify-center gap-2">
                                 今日收件: {stats.inbound} | 
-                                {/* 修改 4: 系統狀態燈號 */}
                                 {isFirebaseEnabled ? (
                                     <span className="flex items-center text-emerald-500 font-bold"><div className="w-2 h-2 bg-emerald-500 rounded-full mr-1"></div> 正常</span>
                                 ) : (
@@ -534,7 +552,6 @@
                                     <h3 className="text-sm font-bold text-gray-600 flex items-center"><Settings className="w-4 h-4 mr-2" /> 機台與需求資訊</h3>
                                     
                                     <div className="flex flex-col md:flex-row justify-between gap-4">
-                                        {/* 修改 1: 批量新增數量選擇 */}
                                         <div className="flex items-center">
                                             <label className="text-xs text-gray-500 font-medium mr-2">申請數量:</label>
                                             <select 
@@ -602,7 +619,7 @@
                             </div>
                         </Modal>
 
-                        {/* Login Modal (Reuse) */}
+                        {/* Login Modal */}
                         <Modal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} title="後台管理登入">
                             <form onSubmit={handleLogin} className="space-y-6">
                                 <div className="space-y-4">
@@ -620,7 +637,8 @@
             return (
                 <div className="flex h-screen bg-gray-50 font-sans text-gray-700">
                     {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-                    {/* ... Same Admin Layout ... */}
+                    
+                    {/* Sidebar */}
                     <aside className="w-64 bg-slate-900 text-white flex flex-col shadow-xl no-print">
                         <div className="p-6 border-b border-slate-700">
                             <div className="flex items-center gap-2">
@@ -631,7 +649,12 @@
                         <nav className="flex-1 p-4 space-y-2">
                             <button onClick={() => setActiveTab('dashboard')} className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-blue-600' : 'hover:bg-slate-800'}`}><LayoutDashboard className="w-5 h-5 mr-3" /> 戰情看板</button>
                             <button onClick={() => setActiveTab('list')} className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${activeTab === 'list' ? 'bg-blue-600' : 'hover:bg-slate-800'}`}><ListTodo className="w-5 h-5 mr-3" /> 工單管理</button>
-                            <button onClick={() => setActiveTab('my_orders')} className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${activeTab === 'my_orders' ? 'bg-blue-600' : 'hover:bg-slate-800'}`}><ClipboardCheck className="w-5 h-5 mr-3" /> 已承接工單</button>
+                            {/* GUEST 模式不顯示 My Orders 與人員管理 */}
+                            {currentUserRole !== 'GUEST' && (
+                                <button onClick={() => setActiveTab('my_orders')} className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${activeTab === 'my_orders' ? 'bg-blue-600' : 'hover:bg-slate-800'}`}><ClipboardCheck className="w-5 h-5 mr-3" /> 已承接工單</button>
+                            )}
+                            
+                            {/* 修改: 管理者功能區 */}
                             {currentUserRole === 'ADMIN' && (
                                 <>
                                     <button onClick={() => setIsTechModalOpen(true)} className="flex items-center w-full px-4 py-3 rounded-lg transition-colors text-slate-300 hover:bg-slate-800"><Users className="w-5 h-5 mr-3" /> 人員管理</button>
@@ -644,18 +667,43 @@
                                     </div>
                                 </>
                             )}
+                            
+                            {/* 修改: 工程師修改密碼功能 */}
                             {currentUserRole === 'ENGINEER' && (
                                 <button onClick={() => setIsChangePasswordModalOpen(true)} className="flex items-center w-full px-4 py-3 rounded-lg transition-colors text-slate-300 hover:bg-slate-800"><KeyRound className="w-5 h-5 mr-3" /> 修改密碼</button>
                             )}
                         </nav>
+                        
                         <div className="p-4 bg-slate-950 border-t border-slate-800">
                             <div className="flex items-center gap-3 mb-3">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${currentUserRole === 'ADMIN' ? 'bg-amber-500' : 'bg-blue-500'}`}>{currentUserRole === 'ADMIN' ? 'A' : 'E'}</div>
-                                <div><p className="text-sm font-medium">{currentUserRole === 'ADMIN' ? 'Admin' : currentTechName}</p><p className="text-xs text-slate-400">{currentUserRole === 'ADMIN' ? '技術主管' : '技術人員'}</p></div>
+                                {/* Profile Icon: Guest vs Admin/Eng */}
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${currentUserRole === 'GUEST' ? 'bg-gray-500' : currentUserRole === 'ADMIN' ? 'bg-amber-500' : 'bg-blue-500'}`}>
+                                    {currentUserRole === 'GUEST' ? 'G' : currentUserRole === 'ADMIN' ? 'A' : 'E'}
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium">{currentUserRole === 'GUEST' ? '訪客 Guest' : (currentUserRole === 'ADMIN' ? 'Admin' : currentTechName)}</p>
+                                    <p className="text-xs text-slate-400">{currentUserRole === 'GUEST' ? '唯讀模式' : (currentUserRole === 'ADMIN' ? '技術主管' : '技術人員')}</p>
+                                </div>
                             </div>
-                            <button onClick={handleLogout} className="flex items-center justify-center w-full py-2 text-xs text-slate-400 hover:text-white border border-slate-700 hover:bg-slate-800 rounded transition-colors">
-                                <LogOut className="w-3 h-3 mr-1" /> 登出系統
-                            </button>
+                            
+                            {/* Login Button for Guest, Logout for others */}
+                            {currentUserRole === 'GUEST' ? (
+                                <button onClick={() => setIsLoginModalOpen(true)} className="flex items-center justify-center w-full py-2 text-xs text-white bg-slate-700 hover:bg-slate-600 rounded transition-colors mb-2">
+                                    <LogIn className="w-3 h-3 mr-1" /> 登入系統
+                                </button>
+                            ) : (
+                                <button onClick={handleLogout} className="flex items-center justify-center w-full py-2 text-xs text-slate-400 hover:text-white border border-slate-700 hover:bg-slate-800 rounded transition-colors">
+                                    <LogOut className="w-3 h-3 mr-1" /> 登出系統
+                                </button>
+                            )}
+                            
+                            {/* Guest can explicitly go back to Kiosk if needed, though they are technically in the "app" now */}
+                            {currentUserRole === 'GUEST' && (
+                                <button onClick={handleLogout} className="flex items-center justify-center w-full py-2 text-xs text-slate-400 hover:text-white border border-slate-700 hover:bg-slate-800 rounded transition-colors">
+                                    <LogOut className="w-3 h-3 mr-1" /> 返回前台
+                                </button>
+                            )}
+
                             <div className="mt-4 text-[10px] text-slate-600 text-center">系統維護 Finn_huang #25619</div>
                         </div>
                     </aside>
@@ -698,6 +746,7 @@
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                         <h2 className="text-2xl font-bold text-gray-800">{activeTab === 'my_orders' ? '已承接工單' : '工單列表'}</h2>
                                         <div className="flex gap-3">
+                                            {/* Updated: Show filter for both tabs */}
                                             <div className="relative">
                                                 <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-gray-500 text-sm h-full">
                                                     <option value="UNFINISHED">未完成 (進行中)</option>
@@ -709,14 +758,21 @@
                                                 </select>
                                                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700"><Filter className="w-4 h-4" /></div>
                                             </div>
-                                            <button onClick={handleExportCSV} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors shadow-sm"><Download className="w-4 h-4 mr-2" /> 匯出 CSV</button>
-                                            <button onClick={() => setIsAddModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors shadow-sm"><Plus className="w-4 h-4 mr-2" /> 新增工單</button>
+                                            
+                                            {/* Hide Export/Add for GUEST */}
+                                            {currentUserRole !== 'GUEST' && (
+                                                <>
+                                                    <button onClick={handleExportCSV} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors shadow-sm"><Download className="w-4 h-4 mr-2" /> 匯出 CSV</button>
+                                                    <button onClick={() => setIsAddModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors shadow-sm"><Plus className="w-4 h-4 mr-2" /> 新增工單</button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                                         <table className="w-full text-left">
                                             <thead className="bg-gray-50 border-b text-gray-500 text-sm">
                                                 <tr>
+                                                    {/* 修改: 填單時間欄位 */}
                                                     <SortableHeader label="填單時間" sortKey="created_at" />
                                                     <SortableHeader label="單號 / 狀態" sortKey="case_no" />
                                                     <SortableHeader label="機台型號 / 優先級" sortKey="machine_model" />
@@ -730,13 +786,21 @@
                                                 {filteredOrders.length > 0 ? (
                                                     filteredOrders.map(order => (
                                                         <tr key={order.id} className={`hover:bg-blue-50 transition-colors ${order.priority === 'URGENT' ? 'bg-red-50 hover:bg-red-100' : ''}`}>
+                                                            {/* 修改: 顯示詳細時間 */}
                                                             <td className="p-4 text-gray-600 font-mono text-xs">{formatDateTime(order.created_at)}</td>
                                                             <td className="p-4"><div className="font-bold text-gray-800">{order.case_no}</div><div className="mt-1"><StatusBadge status={order.status} /></div></td>
                                                             <td className="p-4"><div className="font-medium">{order.machine_model}</div><div className="mt-1"><PriorityBadge priority={order.priority || 'NORMAL'} /></div></td>
                                                             <td className="p-4"><div>{order.source_dept}</div></td>
                                                             <td className="p-4"><div className="text-gray-700">{order.requester_name}</div><div className="text-xs text-gray-400">Ext: {order.extension}</div></td>
                                                             <td className="p-4"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs text-gray-600 font-bold">{(order.current_owner || '?')[0]}</div>{order.current_owner}</div></td>
-                                                            <td className="p-4 text-right"><button onClick={() => handleOpenDetail(order)} className="text-blue-600 hover:text-blue-800 hover:bg-blue-100 px-3 py-1 rounded border border-blue-200 transition-colors">詳情 / 編輯</button></td>
+                                                            <td className="p-4 text-right">
+                                                                <button 
+                                                                    onClick={() => handleOpenDetail(order)} 
+                                                                    className={`px-3 py-1 rounded border transition-colors ${currentUserRole === 'GUEST' ? 'text-gray-500 border-gray-200 bg-gray-50 hover:bg-gray-100' : 'text-blue-600 border-blue-200 hover:text-blue-800 hover:bg-blue-100'}`}
+                                                                >
+                                                                    {currentUserRole === 'GUEST' ? <Eye size={16} /> : '詳情 / 編輯'}
+                                                                </button>
+                                                            </td>
                                                         </tr>
                                                     ))
                                                 ) : (
@@ -759,123 +823,81 @@
                                     <button onClick={handlePrintOrder} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm transition-colors"><Printer size={16} /> 列印工單</button>
                                 </div>
 
-                                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                    <div><div className="text-sm text-blue-600 font-bold mb-1">工單編號</div><div className="text-xl font-bold text-gray-800 flex items-center gap-2">{editForm.case_no}<select name="priority" value={editForm.priority || 'NORMAL'} onChange={handleEditFormChange} className={`text-xs ml-2 px-2 py-1 rounded border outline-none font-bold ${editForm.priority === 'URGENT' ? 'bg-red-100 text-red-600 border-red-200' : 'bg-white text-gray-600 border-gray-300'}`}><option value="NORMAL">一般件</option><option value="URGENT">🔥 急件</option></select></div></div>
-                                    <div className="relative group"><label className="text-xs text-blue-500 font-bold mb-1 block">維修進度狀態</label><div className="flex items-center bg-white border border-blue-200 rounded-lg px-3 py-1.5 shadow-sm"><select name="status" value={editForm.status} onChange={handleEditFormChange} className="bg-transparent text-sm font-medium text-gray-700 outline-none cursor-pointer appearance-none pr-6">{STATUS_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select><ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 pointer-events-none" /></div></div>
-                                </div>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-3 rounded border">
-                                    <div>
-                                        <label className="text-xs text-gray-500 font-bold">來源單位</label>
-                                        <div className="flex gap-2 mt-1">
-                                            <select name="source_dept" value={editForm.source_dept} onChange={handleEditFormChange} className="border rounded px-2 py-1 text-sm flex-1">
-                                                {DEPARTMENTS.map(d => <option key={d} value={d}>{d === 'Other' ? 'Other (其他)' : d}</option>)}
-                                            </select>
-                                            {editForm.source_dept === 'Other' && <input type="text" name="custom_source_dept" value={editForm.custom_source_dept} onChange={handleEditFormChange} placeholder="輸入單位" className="border rounded px-2 py-1 text-sm w-1/2" />}
+                                {/* Guest Mode: Disable All Inputs */}
+                                <fieldset disabled={currentUserRole === 'GUEST'} className="space-y-6">
+
+                                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                        <div><div className="text-sm text-blue-600 font-bold mb-1">工單編號</div><div className="text-xl font-bold text-gray-800 flex items-center gap-2">{editForm.case_no}<select name="priority" value={editForm.priority || 'NORMAL'} onChange={handleEditFormChange} className={`text-xs ml-2 px-2 py-1 rounded border outline-none font-bold ${editForm.priority === 'URGENT' ? 'bg-red-100 text-red-600 border-red-200' : 'bg-white text-gray-600 border-gray-300'}`}><option value="NORMAL">一般件</option><option value="URGENT">🔥 急件</option></select></div></div>
+                                        <div className="relative group"><label className="text-xs text-blue-500 font-bold mb-1 block">維修進度狀態</label><div className="flex items-center bg-white border border-blue-200 rounded-lg px-3 py-1.5 shadow-sm"><select name="status" value={editForm.status} onChange={handleEditFormChange} className="bg-transparent text-sm font-medium text-gray-700 outline-none cursor-pointer appearance-none pr-6">{STATUS_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select><ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 pointer-events-none" /></div></div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-3 rounded border">
+                                        <div>
+                                            <label className="text-xs text-gray-500 font-bold">來源單位</label>
+                                            <div className="flex gap-2 mt-1">
+                                                <select name="source_dept" value={editForm.source_dept} onChange={handleEditFormChange} className="border rounded px-2 py-1 text-sm flex-1">
+                                                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d === 'Other' ? 'Other (其他)' : d}</option>)}
+                                                </select>
+                                                {editForm.source_dept === 'Other' && <input type="text" name="custom_source_dept" value={editForm.custom_source_dept} onChange={handleEditFormChange} placeholder="輸入單位" className="border rounded px-2 py-1 text-sm w-1/2" />}
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between gap-4">
+                                            <div><label className="text-xs text-gray-500 font-bold">送件人</label><div className="mt-1 font-medium">{editForm.requester_name}</div></div>
+                                            <div><label className="text-xs text-gray-500 font-bold">分機</label><div className="mt-1 font-medium">{editForm.extension || '-'}</div></div>
                                         </div>
                                     </div>
-                                    <div className="flex justify-between gap-4">
-                                        <div><label className="text-xs text-gray-500 font-bold">送件人</label><div className="mt-1 font-medium">{editForm.requester_name}</div></div>
-                                        <div><label className="text-xs text-gray-500 font-bold">分機</label><div className="mt-1 font-medium">{editForm.extension || '-'}</div></div>
-                                    </div>
-                                </div>
 
-                                <div className={`p-4 rounded-lg border flex items-center justify-between ${currentUserRole === 'ADMIN' ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
-                                    <div className="flex items-center gap-3"><div className={`p-2 rounded-full ${currentUserRole === 'ADMIN' ? 'bg-amber-100' : 'bg-gray-200'}`}><UserCog className={`w-5 h-5 ${currentUserRole === 'ADMIN' ? 'text-amber-600' : 'text-gray-500'}`} /></div><div><div className={`text-sm font-bold ${currentUserRole === 'ADMIN' ? 'text-amber-800' : 'text-gray-600'}`}>負責人 (Owner)</div><div className={`text-xs ${currentUserRole === 'ADMIN' ? 'text-amber-600' : 'text-gray-500'}`}>{currentUserRole === 'ADMIN' ? '指派技術人員處理' : '如需轉派請聯繫主管'}</div></div></div>
-                                    <div className="relative min-w-[150px] flex items-center gap-2">
-                                        {/* 工程師承接按鈕 */}
-                                        {currentUserRole === 'ENGINEER' && editForm.current_owner === '未指派' ? (
-                                            <button onClick={handleSelfAssign} className="w-full bg-blue-600 text-white text-sm py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-1">
-                                                <Hand size={16} /> 我要承接
-                                            </button>
-                                        ) : (
-                                            <>
-                                                <select name="current_owner" value={editForm.current_owner} onChange={handleEditFormChange} disabled={currentUserRole !== 'ADMIN'} className={`w-full text-sm rounded-lg px-3 py-2 outline-none appearance-none ${currentUserRole === 'ADMIN' ? 'bg-white border border-amber-300 text-gray-700 focus:ring-2 focus:ring-amber-400' : 'bg-gray-100 border border-gray-300 text-gray-500 cursor-not-allowed'}`}>{technicians.map(tech => <option key={tech.name} value={tech.name}>{tech.name}</option>)} <option value="未指派">未指派</option></select>
-                                                {currentUserRole === 'ADMIN' && <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />}
-                                            </>
-                                        )}
+                                    <div className={`p-4 rounded-lg border flex items-center justify-between ${currentUserRole === 'ADMIN' ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
+                                        <div className="flex items-center gap-3"><div className={`p-2 rounded-full ${currentUserRole === 'ADMIN' ? 'bg-amber-100' : 'bg-gray-200'}`}><UserCog className={`w-5 h-5 ${currentUserRole === 'ADMIN' ? 'text-amber-600' : 'text-gray-500'}`} /></div><div><div className={`text-sm font-bold ${currentUserRole === 'ADMIN' ? 'text-amber-800' : 'text-gray-600'}`}>負責人 (Owner)</div><div className={`text-xs ${currentUserRole === 'ADMIN' ? 'text-amber-600' : 'text-gray-500'}`}>{currentUserRole === 'ADMIN' ? '指派技術人員處理' : '如需轉派請聯繫主管'}</div></div></div>
+                                        <div className="relative min-w-[150px] flex items-center gap-2">
+                                            {/* 工程師承接按鈕 */}
+                                            {currentUserRole === 'ENGINEER' && editForm.current_owner === '未指派' ? (
+                                                <button onClick={handleSelfAssign} className="w-full bg-blue-600 text-white text-sm py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-1">
+                                                    <Hand size={16} /> 我要承接
+                                                </button>
+                                            ) : (
+                                                <>
+                                                    <select name="current_owner" value={editForm.current_owner} onChange={handleEditFormChange} disabled={currentUserRole !== 'ADMIN'} className={`w-full text-sm rounded-lg px-3 py-2 outline-none appearance-none ${currentUserRole === 'ADMIN' ? 'bg-white border border-amber-300 text-gray-700 focus:ring-2 focus:ring-amber-400' : 'bg-gray-100 border border-gray-300 text-gray-500 cursor-not-allowed'}`}>{technicians.map(tech => <option key={tech.name} value={tech.name}>{tech.name}</option>)} <option value="未指派">未指派</option></select>
+                                                    {currentUserRole === 'ADMIN' && <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />}
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200"><div className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">故障描述</div><p className="text-gray-800 bg-white p-3 rounded border border-gray-200 min-h-[80px]">{editForm.issue_description}</p></div>
-                                
-                                <div className="space-y-1"><label className="text-xs text-gray-500 font-bold flex items-center"><MessageSquare className="w-3 h-3 mr-1" />維修/處理備註 (Technician Note)</label><textarea name="maintenance_note" value={editForm.maintenance_note || ''} onChange={handleEditFormChange} className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" rows="3" placeholder="填寫維修細節、更換零件或處理狀況..." /></div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-1"><div className="text-xs text-gray-500">機台序號</div><div className="font-medium font-mono bg-gray-100 px-2 py-1 rounded inline-block">{editForm.machine_serial}</div></div>
-                                    <div className="space-y-1"><div className="text-xs text-gray-500">機台型號</div><div className="font-medium">{editForm.machine_model}</div></div>
-                                    <div className="space-y-1"><div className="text-xs text-gray-500">填單人期望完成日</div><div className="font-medium text-gray-600">{editForm.requester_eta_date || '未指定'}</div></div>
-                                    <div className="space-y-1"><div className="text-xs text-gray-500 font-bold text-blue-600">工程師預計完工日 (ETA)</div><input type="date" name="eta_date" value={editForm.eta_date} onChange={handleEditFormChange} className={`w-full border rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none ${editForm.is_overdue ? "text-red-600 border-red-300" : "text-gray-800 border-gray-300"}`} /></div>
-                                </div>
+                                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200"><div className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">故障描述</div><p className="text-gray-800 bg-white p-3 rounded border border-gray-200 min-h-[80px]">{editForm.issue_description}</p></div>
+                                    
+                                    <div className="space-y-1"><label className="text-xs text-gray-500 font-bold flex items-center"><MessageSquare className="w-3 h-3 mr-1" />維修/處理備註 (Technician Note)</label><textarea name="maintenance_note" value={editForm.maintenance_note || ''} onChange={handleEditFormChange} className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" rows="3" placeholder="填寫維修細節、更換零件或處理狀況..." /></div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-1"><div className="text-xs text-gray-500">機台序號</div><div className="font-medium font-mono bg-gray-100 px-2 py-1 rounded inline-block">{editForm.machine_serial}</div></div>
+                                        <div className="space-y-1"><div className="text-xs text-gray-500">機台型號</div><div className="font-medium">{editForm.machine_model}</div></div>
+                                        <div className="space-y-1"><div className="text-xs text-gray-500">填單人期望完成日</div><div className="font-medium text-gray-600">{editForm.requester_eta_date || '未指定'}</div></div>
+                                        <div className="space-y-1"><div className="text-xs text-gray-500 font-bold text-blue-600">工程師預計完工日 (ETA)</div><input type="date" name="eta_date" value={editForm.eta_date} onChange={handleEditFormChange} className={`w-full border rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none ${editForm.is_overdue ? "text-red-600 border-red-300" : "text-gray-800 border-gray-300"}`} /></div>
+                                    </div>
+                                </fieldset>
 
                                 <div className="flex justify-between items-center pt-4 border-t border-gray-100 no-print">
                                     <div>{currentUserRole === 'ADMIN' && <button onClick={handleDeleteOrder} className="px-3 py-2 text-sm text-red-500 hover:bg-red-50 hover:text-red-700 rounded-lg flex items-center transition-colors"><Trash2 className="w-4 h-4 mr-1" /> 刪除工單</button>}</div>
-                                    <div className="flex gap-3"><button onClick={() => setIsDetailModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">取消</button><button onClick={handleUpdateOrder} className="px-6 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center"><Save className="w-4 h-4 mr-2" /> 儲存變更</button></div>
+                                    <div className="flex gap-3">
+                                        <button onClick={() => setIsDetailModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+                                            {currentUserRole === 'GUEST' ? '關閉' : '取消'}
+                                        </button>
+                                        {currentUserRole !== 'GUEST' && (
+                                            <button onClick={handleUpdateOrder} className="px-6 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center"><Save className="w-4 h-4 mr-2" /> 儲存變更</button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         )}
                     </Modal>
 
-                    {/* Admin Add Modal (Same as Kiosk) */}
-                    <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="新增改機工單">
-                        <form onSubmit={handleSubmitNewOrder} className="space-y-6">
-                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
-                                <h3 className="text-sm font-bold text-gray-600 flex items-center"><Settings className="w-4 h-4 mr-2" /> 機台與需求資訊</h3>
-                                <div className="flex flex-col md:flex-row justify-between gap-4">
-                                    <div className="flex items-center"><label className="text-xs text-gray-500 font-medium mr-2">申請數量:</label><select name="quantity" value={newOrderForm.quantity} onChange={handleAddFormChange} className="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:ring-2 focus:ring-blue-500">{[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n} 台</option>)}</select></div>
-                                    <div className="flex items-center"><label className="text-xs text-gray-500 font-medium mr-2">優先級:</label><div className="flex gap-4"><label className="flex items-center cursor-pointer"><input type="radio" name="priority" value="NORMAL" checked={newOrderForm.priority === 'NORMAL'} onChange={handleAddFormChange} className="mr-1"/><span className="text-sm text-gray-700">一般件</span></label><label className="flex items-center cursor-pointer"><input type="radio" name="priority" value="URGENT" checked={newOrderForm.priority === 'URGENT'} onChange={handleAddFormChange} className="mr-1 accent-red-500"/><span className="text-sm text-red-600 font-bold">急件</span></label></div></div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-1"><label className="text-xs text-gray-500 font-medium">來源單位 <span className="text-red-500">*</span></label><select name="source_dept" required value={newOrderForm.source_dept} onChange={handleAddFormChange} className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none bg-white">{DEPARTMENTS.map(d => <option key={d} value={d}>{d === 'Other' ? 'Other (其他)' : d}</option>)}</select>{newOrderForm.source_dept === 'Other' && <input type="text" name="custom_source_dept" value={newOrderForm.custom_source_dept} onChange={handleAddFormChange} placeholder="請輸入單位名稱" className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm outline-none" required />}</div>
-                                    <div className="space-y-1"><label className="text-xs text-gray-500 font-medium">送件人姓名 <span className="text-red-500">*</span></label><input type="text" name="requester_name" required value={newOrderForm.requester_name} onChange={handleAddFormChange} placeholder="請輸入姓名" className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none" /></div>
-                                    <div className="space-y-1"><label className="text-xs text-gray-500 font-medium">分機 (Ext.) <span className="text-red-500">*</span></label><input type="text" name="extension" required value={newOrderForm.extension} onChange={handleAddFormChange} placeholder="例如: 1234" className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none" /></div>
-                                    <div className="space-y-1"><label className="text-xs text-gray-500 font-medium">機台型號 <span className="text-red-500">*</span></label><input type="text" name="machine_model" required value={newOrderForm.machine_model} onChange={handleAddFormChange} placeholder="例如: H7607BA" className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none" /></div>
-                                    <div className="space-y-1"><label className="text-xs text-gray-500 font-medium">機台序號 (S/N)</label><input type="text" name="machine_serial" value={newOrderForm.machine_serial} onChange={handleAddFormChange} placeholder="例如 SN-123456" className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none" /></div>
-                                    <div className="space-y-1"><label className="text-xs text-gray-500 font-medium">填單人期望完成日</label><input type="date" name="requester_eta_date" value={newOrderForm.requester_eta_date} onChange={handleAddFormChange} className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none" /></div>
-                                </div>
+                    {/* Login Modal (Reuse) */}
+                    <Modal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} title="後台管理登入">
+                        <form onSubmit={handleLogin} className="space-y-6">
+                            <div className="space-y-4">
+                                <div className="space-y-1"><label className="text-sm font-medium text-gray-700">帳號 (Username)</label><div className="relative"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><User size={18} /></div><input type="text" value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="pl-10 w-full border border-gray-300 rounded-lg py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="請輸入帳號" required /></div></div>
+                                <div className="space-y-1"><label className="text-sm font-medium text-gray-700">密碼 (Password)</label><div className="relative"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><Lock size={18} /></div><input type="password" value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} className="pl-10 w-full border border-gray-300 rounded-lg py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="請輸入密碼" required /></div></div>
                             </div>
-                            <div className="space-y-1"><label className="text-xs text-gray-500 font-medium">需求/問題描述 <span className="text-red-500">*</span></label><textarea name="issue_description" required value={newOrderForm.issue_description} onChange={handleAddFormChange} placeholder="請詳細描述改機需求..." rows="4" className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none resize-none"></textarea></div>
-                            <div className="pt-2 flex justify-end gap-3"><button type="button" onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">取消</button><button type="submit" className="px-6 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center"><Save className="w-4 h-4 mr-2" /> 送出申請</button></div>
-                        </form>
-                    </Modal>
-
-                    {/* 修改 1: 人員管理 Modal */}
-                    <Modal isOpen={isTechModalOpen} onClose={() => setIsTechModalOpen(false)} title="維修人員管理">
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                <input type="text" value={newTechForm.name} onChange={(e) => setNewTechForm({...newTechForm, name: e.target.value})} placeholder="姓名" className="border rounded px-3 py-2 text-sm outline-none" />
-                                <input type="text" value={newTechForm.username} onChange={(e) => setNewTechForm({...newTechForm, username: e.target.value})} placeholder="帳號" className="border rounded px-3 py-2 text-sm outline-none" />
-                                <input type="text" value={newTechForm.password} onChange={(e) => setNewTechForm({...newTechForm, password: e.target.value})} placeholder="密碼" className="border rounded px-3 py-2 text-sm outline-none" />
-                            </div>
-                            <button onClick={handleAddTechnician} className="w-full bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700 flex justify-center items-center"><UserPlus className="w-4 h-4 mr-1" /> 新增人員</button>
-                            <div className="border rounded divide-y max-h-64 overflow-y-auto bg-gray-50">
-                                {technicians.map((tech) => (
-                                    <div key={tech.username} className="flex justify-between items-center p-3 hover:bg-white">
-                                        <div className="flex flex-col">
-                                            <span className="font-bold text-gray-700">{tech.name}</span>
-                                            <span className="text-xs text-gray-400">帳號: {tech.username} / 密碼: {tech.password}</span>
-                                        </div>
-                                        <button onClick={() => handleDeleteTechnician(tech.username)} className="text-red-500 hover:text-red-700"><MinusCircle className="w-4 h-4" /></button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </Modal>
-
-                    {/* 修改密碼 Modal */}
-                    <Modal isOpen={isChangePasswordModalOpen} onClose={() => setIsChangePasswordModalOpen(false)} title="修改登入密碼">
-                        <form onSubmit={handleChangePassword} className="space-y-4">
-                            <div className="space-y-1">
-                                <label className="text-sm font-medium text-gray-700">新密碼</label>
-                                <input type="password" value={passwordForm.newPassword} onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})} className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none" required />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-sm font-medium text-gray-700">確認新密碼</label>
-                                <input type="password" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})} className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none" required />
-                            </div>
-                            <div className="flex justify-end gap-2 pt-2">
-                                <button type="button" onClick={() => setIsChangePasswordModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
-                                <button type="submit" className="px-6 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg">確認修改</button>
-                            </div>
+                            <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg">登入</button>
                         </form>
                     </Modal>
                 </div>
