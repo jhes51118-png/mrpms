@@ -21,6 +21,7 @@
             "lucide-react": "https://esm.sh/lucide-react@0.292.0",
             "recharts": "https://esm.sh/recharts@2.12.0?external=react,react-dom",
             "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+            "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
             "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
         }
     }
@@ -73,6 +74,8 @@
         
         // 引入 Firebase 功能
         import { initializeApp } from 'firebase/app';
+        // 1. 引入必要的 Firebase Auth 函式
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
         import { getFirestore, collection, getDocs, addDoc, onSnapshot, query, orderBy, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 
         // 引入 UI 套件
@@ -104,12 +107,27 @@
 
         // 檢查是否已設定 Firebase
         let db = null;
+        let auth = null;
         const isFirebaseEnabled = firebaseConfig.apiKey !== undefined;
 
         if (isFirebaseEnabled) {
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
+                
+                // 初始化 Authentication
+                auth = getAuth(app);
+
+                // 2. 執行匿名登入邏輯 (靜默登入)
+                signInAnonymously(auth)
+                    .then(() => {
+                        // 登入成功！
+                        console.log("匿名登入成功 (Silent Login Success)");
+                    })
+                    .catch((error) => {
+                        console.error("匿名登入失敗:", error);
+                    });
+
                 console.log("Firebase 已連線");
             } catch (e) {
                 console.error("Firebase 初始化失敗:", e);
@@ -323,24 +341,43 @@
                 setToast({ message, type });
             };
 
-            // 資料載入邏輯
+            // 資料載入邏輯 (Modified to wait for Auth)
             useEffect(() => {
-                if (isFirebaseEnabled && db) {
-                    const q = query(collection(db, "work_orders"), orderBy("created_at", "desc"));
-                    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-                        const firebaseOrders = querySnapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                        setOrders(firebaseOrders);
-                        setLoading(false);
-                    }, (error) => {
-                        console.error("Firebase error:", error);
-                        showToast("無法讀取資料庫，請檢查連線", "error");
-                        setLoading(false);
+                let unsubscribeSnapshot = null;
+
+                if (isFirebaseEnabled && db && auth) {
+                    // 3. 監聽登入狀態 (將資料庫讀取移至此處)
+                    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+                        if (user) {
+                            console.log("目前使用者 ID:", user.uid);
+                            // 這裡執行 Firestore 資料讀取
+                            const q = query(collection(db, "work_orders"), orderBy("created_at", "desc"));
+                            unsubscribeSnapshot = onSnapshot(q, (querySnapshot) => {
+                                const firebaseOrders = querySnapshot.docs.map(doc => ({
+                                    id: doc.id,
+                                    ...doc.data()
+                                }));
+                                setOrders(firebaseOrders);
+                                setLoading(false);
+                            }, (error) => {
+                                console.error("Firebase error:", error);
+                                // 有些權限問題是正常的（例如未登入時），不一定每次都報錯
+                                // showToast("無法讀取資料庫", "error"); 
+                                setLoading(false);
+                            });
+                        } else {
+                            // 使用者未登入，但若是訪客模式也可能無法讀取(視規則而定)，這裡保持 loading 關閉
+                            console.log("使用者未登入");
+                            setLoading(false); 
+                        }
                     });
-                    return () => unsubscribe();
+
+                    return () => {
+                        unsubscribeAuth();
+                        if (unsubscribeSnapshot) unsubscribeSnapshot();
+                    };
                 } else {
+                    // 模擬資料模式
                     setTimeout(() => {
                         setOrders(INITIAL_ORDERS);
                         setLoading(false);
@@ -406,7 +443,7 @@
                     eta_date: editForm.eta_date, 
                     priority: editForm.priority, 
                     maintenance_note: editForm.maintenance_note || '',
-                    updated_at: new Date().toISOString() // 記錄更新時間
+                    updated_at: new Date().toISOString() 
                 };
                 if (isFirebaseEnabled && db) {
                     try { await updateDoc(doc(db, "work_orders", editForm.id), updateData); showToast("工單更新成功！"); setIsDetailModalOpen(false); } catch (error) { showToast("更新失敗: " + error.message, "error"); }
@@ -415,7 +452,6 @@
                 }
             };
 
-            // 修正: 承接工單自動儲存功能 (Auto Save Self-Assign)
             const handleSelfAssign = async () => { 
                 if (!editForm || currentUserRole !== 'ENGINEER') return; 
                 
@@ -425,7 +461,6 @@
                     updated_at: new Date().toISOString()
                 };
 
-                // Optimistic Update UI
                 setEditForm(prev => ({ ...prev, ...updatePayload }));
 
                 if (isFirebaseEnabled && db) {
@@ -438,7 +473,6 @@
                         showToast("承接失敗: " + error.message, "error");
                     }
                 } else {
-                    // Mock Update
                     setOrders(prev => prev.map(o => o.id === editForm.id ? { ...o, ...updatePayload } : o));
                     showToast(`承接成功 (模擬模式)`);
                 }
@@ -497,11 +531,9 @@
                     if (statusFilter === 'CLOSED') return order.status === 'CLOSED';
                     if (statusFilter === 'TODAY') return order.inbound_date === getLocalYYYYMMDD();
                     if (statusFilter === 'OVERDUE') return order.is_overdue;
-                    // 新增: 今日完成篩選邏輯
                     if (statusFilter === 'TODAY_DONE') {
                         const isDone = ['READY', 'CLOSED'].includes(order.status);
                         if (!isDone) return false;
-                        // 若有更新時間且為今日，或入庫日為今日 (Fallback)
                         if (order.updated_at) return order.updated_at.startsWith(getLocalYYYYMMDD());
                         return order.inbound_date === getLocalYYYYMMDD();
                     }
@@ -621,7 +653,7 @@
                                     </div>
                                     {currentUserRole !== 'GUEST' && (
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80 lg:col-span-2"><h3 className="mb-4 font-bold text-gray-700">工程師完工績效 (Completed Cases)</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={techPerformanceData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" allowDecimals={false} /><YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12}} /><RechartsTooltip /><Bar dataKey="count" fill="#10b981" radius={[0, 4, 4, 0]} barSize={25} name="完工件數" /></BarChart></ResponsiveContainer></div>
+                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80 lg:col-span-2"><h3 className="mb-4 font-bold text-gray-700">工程師完工績效 (Completed Cases)</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={techPerformanceData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" allowDecimals={false} /><YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12}} /><RechartsTooltip /><Bar dataKey="active" fill="#f59e0b" name="處理中" radius={[0, 4, 4, 0]} barSize={10} /><Bar dataKey="completed" fill="#10b981" name="已完成" radius={[0, 4, 4, 0]} barSize={10} /></BarChart></ResponsiveContainer></div>
                                             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80"><h3 className="mb-4 font-bold text-gray-700">各單位送件佔比</h3><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={chartData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} dataKey="value" label>{chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}</Pie><RechartsTooltip /><Legend /></PieChart></ResponsiveContainer></div>
                                             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80"><h3 className="mb-4 font-bold text-gray-700">案件狀態分佈</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={statusData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" /><YAxis dataKey="name" type="category" width={80} tick={{fontSize: 12}} /><RechartsTooltip /><Bar dataKey="count" fill="#4f46e5" radius={[0, 4, 4, 0]} barSize={20} /></BarChart></ResponsiveContainer></div>
                                         </div>
