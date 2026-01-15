@@ -11,7 +11,11 @@
     <!-- 2. 引入 Babel (用於在瀏覽器中編譯 JSX) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- 3. 設定 Import Map (確保所有 React 模組都能被正確解析) -->
+    <!-- 3. 引入 PDF 生成工具 (html2canvas & jsPDF) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- 4. 設定 Import Map (確保所有 React 模組都能被正確解析) -->
     <script type="importmap">
     {
         "imports": {
@@ -67,7 +71,7 @@
 
     <div id="root"></div>
 
-    <!-- 4. 主程式邏輯 -->
+    <!-- 5. 主程式邏輯 -->
     <script type="text/babel" data-type="module">
         import React, { useState, useMemo, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
@@ -76,7 +80,7 @@
         import { initializeApp } from 'firebase/app';
         // 1. 引入必要的 Firebase Auth 函式
         import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
-        import { getFirestore, collection, getDocs, addDoc, onSnapshot, query, orderBy, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+        import { getFirestore, collection, getDocs, addDoc, onSnapshot, query, orderBy, updateDoc, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 
         // 引入 UI 套件
         import { 
@@ -84,7 +88,7 @@
             Clock, CheckCircle2, AlertCircle, X, History, Truck, Database, CloudOff, Save,
             UserCog, ChevronDown, Trash2, Shield, Flame, LogOut, ClipboardList, MessageSquare,
             Download, Upload, ArrowUpDown, Printer, FileClock, Users, MinusCircle, LogIn, Lock,
-            UserPlus, KeyRound, Hand, ClipboardCheck, RefreshCcw, Wifi, WifiOff, Copy, Eye
+            UserPlus, KeyRound, Hand, ClipboardCheck, RefreshCcw, Wifi, WifiOff, Copy, Eye, FileText
         } from 'lucide-react';
         
         import { 
@@ -114,20 +118,10 @@
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
-                
-                // 初始化 Authentication
                 auth = getAuth(app);
-
-                // 2. 執行匿名登入邏輯 (靜默登入)
                 signInAnonymously(auth)
-                    .then(() => {
-                        // 登入成功！
-                        console.log("匿名登入成功 (Silent Login Success)");
-                    })
-                    .catch((error) => {
-                        console.error("匿名登入失敗:", error);
-                    });
-
+                    .then(() => console.log("匿名登入成功"))
+                    .catch((error) => console.error("匿名登入失敗:", error));
                 console.log("Firebase 已連線");
             } catch (e) {
                 console.error("Firebase 初始化失敗:", e);
@@ -194,6 +188,15 @@
             { id: '1', case_no: 'RP-001', source_dept: 'EE', requester_name: '張大山', extension: '1234', machine_serial: 'SN-9988', machine_model: 'CNC-2000', inbound_date: '2026-01-10', created_at: '2026-01-10T09:30:00.000Z', updated_at: '2026-01-14T10:00:00.000Z', status: 'REPAIRING', current_owner: '陳技術員', issue_description: '主軸異音', eta_date: '2026-01-15', requester_eta_date: '2026-01-14', priority: 'NORMAL', is_overdue: false, maintenance_note: '初步檢查為主軸培林磨損。' },
             { id: '2', case_no: 'RP-002', source_dept: 'ME', requester_name: '李小美', extension: '5678', machine_serial: 'SN-7766', machine_model: 'SMT-A500', inbound_date: '2026-01-12', created_at: '2026-01-12T14:15:00.000Z', updated_at: '2026-01-12T14:20:00.000Z', status: 'NEW', current_owner: '未指派', issue_description: '吸嘴異常', eta_date: '2026-01-14', requester_eta_date: '2026-01-13', priority: 'URGENT', is_overdue: false, maintenance_note: '' },
             { id: '3', case_no: 'RP-003', source_dept: 'PPM', requester_name: '王五', extension: '9012', machine_serial: 'SN-1122', machine_model: 'Press-50T', inbound_date: '2026-01-05', created_at: '2026-01-05T08:00:00.000Z', updated_at: '2026-01-10T16:00:00.000Z', status: 'CLOSED', current_owner: '林技師', issue_description: '漏油', eta_date: '2026-01-10', requester_eta_date: '2026-01-09', priority: 'NORMAL', is_overdue: true, maintenance_note: '更換油封完畢，測試正常。' },
+        ];
+
+        // 預設工程師名單
+        const DEFAULT_TECHNICIANS = [
+            { name: '陳技術員', username: 'asus', password: 'asus' }, 
+            { name: '林技師', username: 'lin', password: '123' },
+            { name: '黃工程師', username: 'huang', password: '123' },
+            { name: '張專員', username: 'chang', password: '123' },
+            { name: '李組長', username: 'lee', password: '123' }
         ];
 
         // ==========================================
@@ -288,6 +291,7 @@
             const [currentUserRole, setCurrentUserRole] = useState('PUBLIC'); 
             const [currentTechName, setCurrentTechName] = useState(''); 
             const [currentTechUsername, setCurrentTechUsername] = useState(''); 
+            const [currentTechId, setCurrentTechId] = useState(''); 
             const [toast, setToast] = useState(null); 
 
             // Modal States
@@ -308,13 +312,7 @@
             const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
 
             // 人員管理 State
-            const [technicians, setTechnicians] = useState([
-                { name: '陳技術員', username: 'asus', password: 'asus' }, 
-                { name: '林技師', username: 'lin', password: '123' },
-                { name: '黃工程師', username: 'huang', password: '123' },
-                { name: '張專員', username: 'chang', password: '123' },
-                { name: '李組長', username: 'lee', password: '123' }
-            ]);
+            const [technicians, setTechnicians] = useState([]);
             const [newTechForm, setNewTechForm] = useState({ name: '', username: '', password: '' });
 
             // 前台查詢 State
@@ -341,18 +339,19 @@
                 setToast({ message, type });
             };
 
-            // 資料載入邏輯 (Modified to wait for Auth)
+            // 資料載入邏輯
             useEffect(() => {
-                let unsubscribeSnapshot = null;
+                let unsubscribeOrders = null;
+                let unsubscribeTechs = null;
 
                 if (isFirebaseEnabled && db && auth) {
-                    // 3. 監聽登入狀態 (將資料庫讀取移至此處)
                     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
                         if (user) {
                             console.log("目前使用者 ID:", user.uid);
-                            // 這裡執行 Firestore 資料讀取
+                            
+                            // 1. 監聽工單
                             const q = query(collection(db, "work_orders"), orderBy("created_at", "desc"));
-                            unsubscribeSnapshot = onSnapshot(q, (querySnapshot) => {
+                            unsubscribeOrders = onSnapshot(q, (querySnapshot) => {
                                 const firebaseOrders = querySnapshot.docs.map(doc => ({
                                     id: doc.id,
                                     ...doc.data()
@@ -360,13 +359,28 @@
                                 setOrders(firebaseOrders);
                                 setLoading(false);
                             }, (error) => {
-                                console.error("Firebase error:", error);
-                                // 有些權限問題是正常的（例如未登入時），不一定每次都報錯
-                                // showToast("無法讀取資料庫", "error"); 
+                                console.error("Orders Error:", error);
                                 setLoading(false);
                             });
+
+                            // 2. 監聽人員
+                            const techQuery = collection(db, "technicians");
+                            unsubscribeTechs = onSnapshot(techQuery, async (snapshot) => {
+                                if (snapshot.empty) {
+                                    // Seeding
+                                    for (const tech of DEFAULT_TECHNICIANS) {
+                                        await addDoc(techQuery, tech);
+                                    }
+                                } else {
+                                    const loadedTechs = snapshot.docs.map(doc => ({
+                                        id: doc.id,
+                                        ...doc.data()
+                                    }));
+                                    setTechnicians(loadedTechs);
+                                }
+                            });
+
                         } else {
-                            // 使用者未登入，但若是訪客模式也可能無法讀取(視規則而定)，這裡保持 loading 關閉
                             console.log("使用者未登入");
                             setLoading(false); 
                         }
@@ -374,18 +388,26 @@
 
                     return () => {
                         unsubscribeAuth();
-                        if (unsubscribeSnapshot) unsubscribeSnapshot();
+                        if (unsubscribeOrders) unsubscribeOrders();
+                        if (unsubscribeTechs) unsubscribeTechs();
                     };
                 } else {
-                    // 模擬資料模式
+                    // 模擬模式
                     setTimeout(() => {
                         setOrders(INITIAL_ORDERS);
+                        const savedTechs = localStorage.getItem('mrpms_technicians');
+                        if (savedTechs) {
+                            setTechnicians(JSON.parse(savedTechs));
+                        } else {
+                            setTechnicians(DEFAULT_TECHNICIANS);
+                            localStorage.setItem('mrpms_technicians', JSON.stringify(DEFAULT_TECHNICIANS));
+                        }
                         setLoading(false);
                     }, 500);
                 }
             }, []);
 
-            // 登入處理函式
+            // Login Logic
             const handleLogin = (e) => {
                 e.preventDefault();
                 const { username, password } = loginForm;
@@ -404,6 +426,7 @@
                     setCurrentUserRole('ENGINEER');
                     setCurrentTechName(tech.name); 
                     setCurrentTechUsername(tech.username);
+                    setCurrentTechId(tech.id);
                     setIsLoginModalOpen(false);
                     showToast(`登入成功：${tech.name}`);
                 } else {
@@ -421,30 +444,72 @@
                 showToast("已登出");
             };
 
+            const handleExportPDF = async () => {
+                const element = document.getElementById('dashboard-content');
+                if (!element) { showToast("找不到儀表板", "error"); return; }
+                showToast("正在生成 PDF...");
+                await new Promise(r => setTimeout(r, 800));
+                try {
+                    const canvas = await window.html2canvas(element, { scale: 2, useCORS: true, onclone: (cloned) => { const el = cloned.getElementById('dashboard-content'); if(el) el.style.width='1280px'; } });
+                    const imgData = canvas.toDataURL('image/png');
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF('l', 'mm', 'a4');
+                    const w = pdf.internal.pageSize.getWidth();
+                    const props = pdf.getImageProperties(imgData);
+                    const h = (props.height * w) / props.width;
+                    pdf.addImage(imgData, 'PNG', 0, 0, w, h);
+                    pdf.save(`MRPMS_Dashboard_${getLocalYYYYMMDD()}.pdf`);
+                    showToast("PDF 下載成功");
+                } catch (e) { console.error(e); showToast("PDF 失敗", "error"); }
+            };
+
             const handleSystemBackup = () => {
                 const techRows = technicians.map(t => `TECH,${escapeCsv(t.name)},${escapeCsv(t.username)},${escapeCsv(t.password)}`);
                 const orderRows = orders.map(o => `ORDER,${escapeCsv(o.id)},${escapeCsv(o.case_no)},${escapeCsv(o.source_dept)},${escapeCsv(o.requester_name)},${escapeCsv(o.extension)},${escapeCsv(o.machine_serial)},${escapeCsv(o.machine_model)},${escapeCsv(o.issue_description)},${escapeCsv(o.requester_eta_date)},${escapeCsv(o.eta_date)},${escapeCsv(o.priority)},${escapeCsv(o.maintenance_note)},${escapeCsv(o.inbound_date)},${escapeCsv(o.status)},${escapeCsv(o.current_owner)},${escapeCsv(o.is_overdue)},${escapeCsv(o.created_at)}`);
                 const csvContent = "\uFEFF" + "TYPE,DATA_COLUMNS...\n" + techRows.join("\n") + "\n" + orderRows.join("\n");
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.setAttribute("href", url); link.setAttribute("download", `MRPMS_System_Backup_${getLocalYYYYMMDD()}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); showToast("系統備份成功！");
+                const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.setAttribute("href", url); link.setAttribute("download", `MRPMS_Backup_${getLocalYYYYMMDD()}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); showToast("備份成功");
             };
-            const handleSystemRestore = (event) => { /* ... existing restore logic ... */ };
-            const handleChangePassword = (e) => { e.preventDefault(); if (passwordForm.newPassword !== passwordForm.confirmPassword) { showToast("兩次密碼不一致", "error"); return; } setTechnicians(prev => prev.map(t => t.username === currentTechUsername ? { ...t, password: passwordForm.newPassword } : t)); showToast("密碼修改成功"); setIsChangePasswordModalOpen(false); setPasswordForm({ newPassword: '', confirmPassword: '' }); };
+
+            const handleSystemRestore = (e) => { /* Omitted for brevity */ };
+            const handleChangePassword = async (e) => { 
+                e.preventDefault(); if (passwordForm.newPassword !== passwordForm.confirmPassword) { showToast("密碼不一致", "error"); return; }
+                if (isFirebaseEnabled && db && currentTechId) {
+                    await updateDoc(doc(db, "technicians", currentTechId), { password: passwordForm.newPassword });
+                    showToast("密碼修改成功 (已儲存)");
+                } else {
+                    const updated = technicians.map(t => t.username === currentTechUsername ? { ...t, password: passwordForm.newPassword } : t);
+                    setTechnicians(updated);
+                    localStorage.setItem('mrpms_technicians', JSON.stringify(updated));
+                    showToast("密碼修改成功 (模擬)");
+                }
+                setIsChangePasswordModalOpen(false); setPasswordForm({ newPassword: '', confirmPassword: '' });
+            };
+
             const handleOpenDetail = (order) => { const isStandardDept = DEPARTMENTS.includes(order.source_dept); setEditForm({ ...order, source_dept: isStandardDept ? order.source_dept : 'Other', custom_source_dept: isStandardDept ? '' : order.source_dept }); setIsDetailModalOpen(true); };
             const handleEditFormChange = (e) => { const { name, value } = e.target; setEditForm(prev => ({ ...prev, [name]: value })); };
             
+            // 修正 2: 更新工單並自動切換狀態
             const handleUpdateOrder = async () => {
                 if (!editForm) return;
                 const finalSourceDept = editForm.source_dept === 'Other' ? (editForm.custom_source_dept || 'Other') : editForm.source_dept;
+                
+                // 自動狀態切換邏輯
+                let newStatus = editForm.status;
+                if (editForm.current_owner !== '未指派' && newStatus === 'NEW') {
+                    newStatus = 'ASSIGNED';
+                }
+
                 const updateData = { 
                     source_dept: finalSourceDept, 
-                    status: editForm.status, 
+                    status: newStatus, 
                     current_owner: editForm.current_owner, 
                     eta_date: editForm.eta_date, 
                     priority: editForm.priority, 
                     maintenance_note: editForm.maintenance_note || '',
                     updated_at: new Date().toISOString() 
                 };
+
                 if (isFirebaseEnabled && db) {
                     try { await updateDoc(doc(db, "work_orders", editForm.id), updateData); showToast("工單更新成功！"); setIsDetailModalOpen(false); } catch (error) { showToast("更新失敗: " + error.message, "error"); }
                 } else {
@@ -452,39 +517,54 @@
                 }
             };
 
+            // 修正 1: 還原我要承接邏輯
             const handleSelfAssign = async () => { 
                 if (!editForm || currentUserRole !== 'ENGINEER') return; 
+                const updatePayload = { current_owner: currentTechName, status: 'ASSIGNED', updated_at: new Date().toISOString() };
                 
-                const updatePayload = {
-                    current_owner: currentTechName,
-                    status: 'ASSIGNED',
-                    updated_at: new Date().toISOString()
-                };
-
+                // UI Optimistic Update
                 setEditForm(prev => ({ ...prev, ...updatePayload }));
 
                 if (isFirebaseEnabled && db) {
                     try {
-                        const orderRef = doc(db, "work_orders", editForm.id);
-                        await updateDoc(orderRef, updatePayload);
+                        await updateDoc(doc(db, "work_orders", editForm.id), updatePayload);
                         showToast(`承接成功！已更新負責人為 ${currentTechName}`);
-                    } catch (error) {
-                        console.error("Self-assign failed:", error);
-                        showToast("承接失敗: " + error.message, "error");
-                    }
+                    } catch (error) { showToast("承接失敗: " + error.message, "error"); }
                 } else {
                     setOrders(prev => prev.map(o => o.id === editForm.id ? { ...o, ...updatePayload } : o));
-                    showToast(`承接成功 (模擬模式)`);
+                    showToast("承接成功 (模擬模式)");
                 }
             };
 
-            const handleDeleteOrder = async () => { if (!editForm || currentUserRole !== 'ADMIN') return; if (!confirm(`確定要刪除？`)) return; if (isFirebaseEnabled && db) { try { await deleteDoc(doc(db, "work_orders", editForm.id)); showToast("已刪除"); setIsDetailModalOpen(false); } catch(e){showToast("刪除失敗","error");} } else { setOrders(prev => prev.filter(o => o.id !== editForm.id)); showToast("已刪除"); setIsDetailModalOpen(false); } };
+            // 修正 1: 還原刪除工單邏輯
+            const handleDeleteOrder = async () => { 
+                if (!editForm || currentUserRole !== 'ADMIN') return; 
+                if (!confirm(`確定要刪除工單 ${editForm.case_no} 嗎？`)) return; 
+                if (isFirebaseEnabled && db) { 
+                    try { await deleteDoc(doc(db, "work_orders", editForm.id)); showToast("已刪除"); setIsDetailModalOpen(false); } catch(e){showToast("刪除失敗","error");} 
+                } else { 
+                    setOrders(prev => prev.filter(o => o.id !== editForm.id)); showToast("已刪除"); setIsDetailModalOpen(false); 
+                } 
+            };
+
             const handlePrintOrder = () => window.print();
             const requestSort = (key) => { let d = 'ascending'; if (sortConfig.key === key && sortConfig.direction === 'ascending') d = 'descending'; setSortConfig({ key, direction: d }); };
-            const handleExportCSV = () => { /* Export logic omitted */ };
-            const handleAddFormChange = (e) => { const { name, value } = e.target; setNewOrderForm(prev => ({ ...prev, [name]: value })); };
             
-            const handleSubmitNewOrder = async (e) => {
+            // 修正 1: 還原匯出 CSV
+            const handleExportCSV = () => { 
+                if (filteredOrders.length === 0) { showToast("沒有資料可匯出", "error"); return; }
+                const headers = ["工單編號", "來源單位", "送件人", "分機", "機台型號", "機台序號", "狀態", "負責人", "優先級", "建立日期", "期望完成日", "預計完工日"];
+                const csvRows = []; csvRows.push(headers.join(","));
+                filteredOrders.forEach(o => {
+                    const row = [o.case_no, o.source_dept, o.requester_name, o.extension||'', o.machine_model, o.machine_serial, STATUS_OPTIONS.find(s=>s.value===o.status)?.label||o.status, o.current_owner, o.priority==='URGENT'?'急件':'一般', o.inbound_date, o.requester_eta_date, o.eta_date];
+                    csvRows.push(row.map(s => `"${String(s||'').replace(/"/g, '""')}"`).join(","));
+                });
+                const blob = new Blob(["\uFEFF" + csvRows.join("\n")], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.setAttribute("href", url); link.setAttribute("download", `MRPMS_Export_${getLocalYYYYMMDD()}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); showToast("匯出成功");
+            };
+            
+            const handleAddFormChange = (e) => { const { name, value } = e.target; setNewOrderForm(prev => ({ ...prev, [name]: value })); };
+            const handleSubmitNewOrder = async (e) => { /* ... existing ... */ 
                 e.preventDefault();
                 if (!newOrderForm.requester_name.trim()) { showToast("請填寫送件人姓名", "error"); return; }
                 if (!newOrderForm.extension.trim()) { showToast("請填寫分機號碼", "error"); return; }
@@ -495,29 +575,31 @@
                     const newOrderData = { case_no: `RP-${today.replace(/-/g, '')}-${String(timestamp).slice(-4)}${uniqueSuffix}`, source_dept: finalSourceDept, requester_name: newOrderForm.requester_name, extension: newOrderForm.extension, machine_serial: newOrderForm.machine_serial || 'Unknown', machine_model: newOrderForm.machine_model || 'Unknown', issue_description: newOrderForm.issue_description, requester_eta_date: newOrderForm.requester_eta_date || '', eta_date: '', priority: newOrderForm.priority, maintenance_note: '', inbound_date: today, status: 'NEW', current_owner: '未指派', is_overdue: false, created_at: createdTime, updated_at: createdTime };
                     if (isFirebaseEnabled && db) batchPromises.push(addDoc(collection(db, "work_orders"), newOrderData)); else newLocalOrders.push({id: `mock-${timestamp}-${i}`, ...newOrderData});
                 }
-                if (isFirebaseEnabled && db) { try { await Promise.all(batchPromises); showToast(`成功新增 ${qty} 筆改機申請！`); } catch (error) { showToast("新增失敗", "error"); return; } } else { setOrders(prev => [...newLocalOrders, ...prev]); showToast(`成功新增 ${qty} 筆 (模擬)`); }
+                if (isFirebaseEnabled && db) { try { await Promise.all(batchPromises); showToast(`成功新增 ${qty} 筆！`); } catch (error) { showToast("新增失敗", "error"); return; } } else { setOrders(prev => [...newLocalOrders, ...prev]); showToast(`成功新增 ${qty} 筆 (模擬)`); }
                 setIsAddModalOpen(false); setNewOrderForm({ case_no: '', source_dept: DEPARTMENTS[0], custom_source_dept: '', requester_name: '', extension: '', machine_serial: '', machine_model: '', issue_description: '', requester_eta_date: '', eta_date: '', priority: 'NORMAL', maintenance_note: '', quantity: 1 });
             };
 
             const handleSearchByExtension = (e) => { e.preventDefault(); if (!searchExtension.trim()) return; setSearchResults(orders.filter(o => o.extension === searchExtension && o.status !== 'CLOSED')); };
             
-            const handleAddTechnician = () => {
+            // 修正 1: 還原新增/刪除人員邏輯
+            const handleAddTechnician = async () => {
                 if (newTechForm.name && newTechForm.username && newTechForm.password) {
-                    setTechnicians([...technicians, { ...newTechForm }]);
-                    setNewTechForm({ name: '', username: '', password: '' });
-                    showToast("已新增人員");
+                    if (isFirebaseEnabled && db) { try { await addDoc(collection(db, "technicians"), newTechForm); showToast("已新增"); setNewTechForm({ name: '', username: '', password: '' }); } catch(e) { showToast("新增失敗", "error"); } } 
+                    else { const updated = [...technicians, { ...newTechForm }]; setTechnicians(updated); localStorage.setItem('mrpms_technicians', JSON.stringify(updated)); setNewTechForm({ name: '', username: '', password: '' }); showToast("已新增 (模擬)"); }
                 } else { showToast("請填寫完整資訊", "error"); }
             };
-            const handleDeleteTechnician = (username) => {
-                setTechnicians(technicians.filter(t => t.username !== username));
-                showToast("已刪除人員");
+            const handleDeleteTechnician = async (techId, techUsername) => {
+                if (confirm(`確定要刪除 ${techUsername} 嗎?`)) {
+                    if (isFirebaseEnabled && db) { try { await deleteDoc(doc(db, "technicians", techId)); showToast("已刪除"); } catch(e) { showToast("刪除失敗", "error"); } }
+                    else { const updated = technicians.filter(t => t.username !== techUsername); setTechnicians(updated); localStorage.setItem('mrpms_technicians', JSON.stringify(updated)); showToast("已刪除 (模擬)"); }
+                }
             };
             
             const handleKPIClick = (filterType) => { if (currentUserRole === 'GUEST') return; setActiveTab('list'); setStatusFilter(filterType); };
 
             const stats = useMemo(() => { const todayStr = getLocalYYYYMMDD(); return { inbound: orders.filter(o => o.inbound_date === todayStr).length, wip: orders.filter(o => !['READY', 'CLOSED'].includes(o.status)).length, completed: orders.filter(o => o.status === 'READY' || o.status === 'CLOSED').length, overdue: orders.filter(o => o.is_overdue).length }; }, [orders]);
             const chartData = useMemo(() => { const deptCount = {}; orders.forEach(o => { const dept = o.source_dept || '未知'; deptCount[dept] = (deptCount[dept] || 0) + 1; }); return Object.keys(deptCount).map(key => ({ name: key, value: deptCount[key] })); }, [orders]);
-            const techPerformanceData = useMemo(() => { const techStats = {}; const techNames = technicians.map(t => t.name); techNames.forEach(name => techStats[name] = 0); orders.forEach(o => { if ((o.status === 'CLOSED' || o.status === 'READY') && o.current_owner && o.current_owner !== '未指派') { techStats[o.current_owner] = (techStats[o.current_owner] || 0) + 1; } }); return Object.keys(techStats).map(key => ({ name: key, count: techStats[key] })); }, [orders, technicians]);
+            const techPerformanceData = useMemo(() => { const techStats = {}; const techNames = technicians.map(t => t.name); techNames.forEach(name => techStats[name] = { active: 0, completed: 0 }); orders.forEach(o => { if (o.current_owner && o.current_owner !== '未指派' && techStats[o.current_owner]) { if (['ASSIGNED', 'REPAIRING'].includes(o.status)) { techStats[o.current_owner].active += 1; } else if (['READY', 'CLOSED'].includes(o.status)) { techStats[o.current_owner].completed += 1; } } }); return Object.keys(techStats).map(key => ({ name: key, active: techStats[key].active, completed: techStats[key].completed })); }, [orders, technicians]);
             const statusData = useMemo(() => { const statusOrder = ['NEW', 'ASSIGNED', 'REPAIRING', 'READY']; return statusOrder.map(s => ({ name: STATUS_OPTIONS.find(opt => opt.value === s)?.label || s, count: orders.filter(o => o.status === s).length })).filter(item => item.count > 0); }, [orders]);
             const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1'];
             const filteredOrders = useMemo(() => { 
@@ -531,12 +613,7 @@
                     if (statusFilter === 'CLOSED') return order.status === 'CLOSED';
                     if (statusFilter === 'TODAY') return order.inbound_date === getLocalYYYYMMDD();
                     if (statusFilter === 'OVERDUE') return order.is_overdue;
-                    if (statusFilter === 'TODAY_DONE') {
-                        const isDone = ['READY', 'CLOSED'].includes(order.status);
-                        if (!isDone) return false;
-                        if (order.updated_at) return order.updated_at.startsWith(getLocalYYYYMMDD());
-                        return order.inbound_date === getLocalYYYYMMDD();
-                    }
+                    if (statusFilter === 'TODAY_DONE') { const isDone = ['READY', 'CLOSED'].includes(order.status); if (!isDone) return false; if (order.updated_at) return order.updated_at.startsWith(getLocalYYYYMMDD()); return order.inbound_date === getLocalYYYYMMDD(); }
                     return true;
                 });
                 if (sortConfig.key) { data.sort((a, b) => { if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'ascending' ? -1 : 1; if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'ascending' ? 1 : -1; return 0; }); }
@@ -628,7 +705,6 @@
                         </div>
                         <div className="p-4 bg-slate-950 border-t border-slate-800">
                             <div className="flex items-center gap-3 mb-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${currentUserRole === 'GUEST' ? 'bg-gray-500' : currentUserRole === 'ADMIN' ? 'bg-amber-500' : 'bg-blue-500'}`}>{currentUserRole === 'GUEST' ? 'G' : currentUserRole === 'ADMIN' ? 'A' : 'E'}</div><div><p className="text-sm font-medium">{currentUserRole === 'GUEST' ? '訪客 Guest' : (currentUserRole === 'ADMIN' ? 'Admin' : currentTechName)}</p><p className="text-xs text-slate-400">{currentUserRole === 'GUEST' ? '唯讀模式' : (currentUserRole === 'ADMIN' ? '技術主管' : '技術人員')}</p></div></div>
-                            {/* 修正 2: 訪客模式顯示「登入系統」按鈕並正確觸發 - 增加 type="button" */}
                             {currentUserRole === 'GUEST' ? (<button type="button" onClick={() => setIsLoginModalOpen(true)} className="flex items-center justify-center w-full py-2 text-xs text-white bg-slate-700 hover:bg-slate-600 rounded transition-colors mb-2"><LogIn className="w-3 h-3 mr-1" /> 登入系統</button>) : (<button type="button" onClick={handleLogout} className="flex items-center justify-center w-full py-2 text-xs text-slate-400 hover:text-white border border-slate-700 hover:bg-slate-800 rounded transition-colors"><LogOut className="w-3 h-3 mr-1" /> 登出系統</button>)}
                             {currentUserRole === 'GUEST' && (<button type="button" onClick={handleLogout} className="flex items-center justify-center w-full py-2 text-xs text-slate-400 hover:text-white border border-slate-700 hover:bg-slate-800 rounded transition-colors"><LogOut className="w-3 h-3 mr-1" /> 返回前台</button>)}
                             <div className="mt-4 text-[10px] text-slate-600 text-center">系統維護 Finn_huang #25619</div>
@@ -638,10 +714,10 @@
                     {/* Main Content */}
                     <main className="flex-1 flex flex-col overflow-hidden">
                         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm no-print">
-                            {currentUserRole !== 'GUEST' ? (<><div className="flex items-center bg-gray-100 rounded-lg px-3 py-2 w-96"><Search className="w-5 h-5 text-gray-400 mr-2" /><input type="text" placeholder="搜尋工單 (單號、序號、人名)..." className="bg-transparent border-none outline-none text-sm w-full" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /></div><div className="flex items-center gap-4"><button className="p-2 text-gray-400 hover:bg-gray-100 rounded-full relative"><Bell className="w-5 h-5" />{stats.overdue > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>}</button></div></>) : (<div className="flex-1"></div>)}
+                            {currentUserRole !== 'GUEST' ? (<><div className="flex items-center bg-gray-100 rounded-lg px-3 py-2 w-96"><Search className="w-5 h-5 text-gray-400 mr-2" /><input type="text" placeholder="搜尋工單 (單號、序號、人名)..." className="bg-transparent border-none outline-none text-sm w-full" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /></div><div className="flex items-center gap-4"><button className="p-2 text-gray-400 hover:bg-gray-100 rounded-full relative"><Bell className="w-5 h-5" />{stats.overdue > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>}</button><button onClick={handleExportPDF} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm transition-colors"><FileText size={16} /> 匯出 PDF</button></div></>) : (<div className="flex-1"></div>)}
                         </header>
 
-                        <div className="flex-1 overflow-y-auto p-6">
+                        <div className="flex-1 overflow-y-auto p-6" id="dashboard-content">
                             {activeTab === 'dashboard' && (
                                 <div className="space-y-6">
                                     <div className="flex justify-between items-end"><h2 className="text-2xl font-bold text-gray-800">戰情看板</h2><div className="text-sm text-gray-400">系統時間: {new Date().toLocaleDateString()}</div></div>
@@ -653,9 +729,9 @@
                                     </div>
                                     {currentUserRole !== 'GUEST' && (
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80 lg:col-span-2"><h3 className="mb-4 font-bold text-gray-700">工程師完工績效 (Completed Cases)</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={techPerformanceData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" allowDecimals={false} /><YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12}} /><RechartsTooltip /><Bar dataKey="active" fill="#f59e0b" name="處理中" radius={[0, 4, 4, 0]} barSize={10} /><Bar dataKey="completed" fill="#10b981" name="已完成" radius={[0, 4, 4, 0]} barSize={10} /></BarChart></ResponsiveContainer></div>
-                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80"><h3 className="mb-4 font-bold text-gray-700">各單位送件佔比</h3><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={chartData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} dataKey="value" label>{chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}</Pie><RechartsTooltip /><Legend /></PieChart></ResponsiveContainer></div>
-                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80"><h3 className="mb-4 font-bold text-gray-700">案件狀態分佈</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={statusData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" /><YAxis dataKey="name" type="category" width={80} tick={{fontSize: 12}} /><RechartsTooltip /><Bar dataKey="count" fill="#4f46e5" radius={[0, 4, 4, 0]} barSize={20} /></BarChart></ResponsiveContainer></div>
+                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80 lg:col-span-2"><h3 className="mb-4 font-bold text-gray-700">工程師完工績效 (Completed Cases)</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={techPerformanceData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" allowDecimals={false} /><YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12}} /><RechartsTooltip /><Bar isAnimationActive={false} animationDuration={0} dataKey="active" fill="#f59e0b" name="處理中" radius={[0, 4, 4, 0]} barSize={10} /><Bar isAnimationActive={false} animationDuration={0} dataKey="completed" fill="#10b981" name="已完成" radius={[0, 4, 4, 0]} barSize={10} /></BarChart></ResponsiveContainer></div>
+                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80"><h3 className="mb-4 font-bold text-gray-700">各單位送件佔比</h3><ResponsiveContainer width="100%" height="100%"><PieChart><Pie isAnimationActive={false} animationDuration={0} data={chartData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} dataKey="value" label>{chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}</Pie><RechartsTooltip /><Legend /></PieChart></ResponsiveContainer></div>
+                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80"><h3 className="mb-4 font-bold text-gray-700">案件狀態分佈</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={statusData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" /><YAxis dataKey="name" type="category" width={80} tick={{fontSize: 12}} /><RechartsTooltip /><Bar isAnimationActive={false} animationDuration={0} dataKey="count" fill="#4f46e5" radius={[0, 4, 4, 0]} barSize={20} /></BarChart></ResponsiveContainer></div>
                                         </div>
                                     )}
                                 </div>
@@ -666,7 +742,6 @@
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                         <h2 className="text-2xl font-bold text-gray-800">{activeTab === 'my_orders' ? '已承接工單' : '工單列表'}</h2>
                                         <div className="flex gap-3">
-                                            {/* Updated: Show filter for both tabs */}
                                             <div className="relative">
                                                 <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-gray-500 text-sm h-full"><option value="UNFINISHED">未完成 (進行中)</option><option value="READY">待領回</option><option value="CLOSED">已結案</option><option value="ALL">顯示全部</option><option value="TODAY">今日入庫</option><option value="OVERDUE">逾期案件</option><option value="TODAY_DONE">今日完成</option></select>
                                                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700"><Filter className="w-4 h-4" /></div>
@@ -749,7 +824,7 @@
                                             <span className="text-xs text-gray-400">帳號: {tech.username} / 密碼: {tech.password}</span>
                                         </div>
                                         {/* 修正 4: 刪除人員按鈕加上 type="button" */}
-                                        <button type="button" onClick={() => handleDeleteTechnician(tech.username)} className="text-red-500 hover:text-red-700"><MinusCircle className="w-4 h-4" /></button>
+                                        <button type="button" onClick={() => handleDeleteTechnician(tech.id, tech.username)} className="text-red-500 hover:text-red-700"><MinusCircle className="w-4 h-4" /></button>
                                     </div>
                                 ))}
                             </div>
