@@ -11,11 +11,11 @@
     <!-- 2. 引入 Babel (用於在瀏覽器中編譯 JSX) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- 3. 引入 PDF 生成工具 (html2canvas & jsPDF) -->
+    <!-- 3. 引入 PDF 生成工具 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-    <!-- 4. 設定 Import Map (確保所有 React 模組都能被正確解析) -->
+    <!-- 4. 設定 Import Map -->
     <script type="importmap">
     {
         "imports": {
@@ -32,9 +32,7 @@
     </script>
     
     <style>
-        /* 避免載入時閃爍與字體優化 */
         body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-        /* 自定義捲軸樣式 */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -43,62 +41,37 @@
         .animate-fade-in-up { animation: fadeInUp 0.3s ease-out; }
         .animate-slide-in-right { animation: slideInRight 0.3s ease-out; }
         
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes slideInRight {
-            from { opacity: 0; transform: translateX(100%); }
-            to { opacity: 1; transform: translateX(0); }
-        }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
         .cursor-pointer { cursor: pointer; }
 
-        /* 列印專用樣式 */
         @media print {
             body * { visibility: hidden; }
             #detail-modal-content, #detail-modal-content * { visibility: visible; }
-            #detail-modal-content {
-                position: fixed; left: 0; top: 0; width: 100%; height: 100%;
-                overflow: visible; background: white; padding: 0; margin: 0;
-                box-shadow: none; border: none;
-            }
+            #detail-modal-content { position: fixed; left: 0; top: 0; width: 100%; height: 100%; background: white; padding: 0; margin: 0; box-shadow: none; border: none; }
             .no-print { display: none !important; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-700">
-
     <div id="root"></div>
 
-    <!-- 5. 主程式邏輯 -->
     <script type="text/babel" data-type="module">
         import React, { useState, useMemo, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
-        
-        // 引入 Firebase 功能
         import { initializeApp } from 'firebase/app';
-        // 1. 引入必要的 Firebase Auth 函式
         import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
-        import { getFirestore, collection, getDocs, addDoc, onSnapshot, query, orderBy, updateDoc, deleteDoc, doc, writeBatch } from 'firebase/firestore';
-
-        // 引入 UI 套件
+        import { getFirestore, collection, getDocs, addDoc, onSnapshot, query, orderBy, updateDoc, deleteDoc, doc } from 'firebase/firestore';
         import { 
             LayoutDashboard, ListTodo, Settings, Search, Bell, User, Plus, Filter, 
             Clock, CheckCircle2, AlertCircle, X, History, Truck, Database, CloudOff, Save,
             UserCog, ChevronDown, Trash2, Shield, Flame, LogOut, ClipboardList, MessageSquare,
             Download, Upload, ArrowUpDown, Printer, FileClock, Users, MinusCircle, LogIn, Lock,
-            UserPlus, KeyRound, Hand, ClipboardCheck, RefreshCcw, Wifi, WifiOff, Copy, Eye, FileText
+            UserPlus, KeyRound, Hand, ClipboardCheck, RefreshCcw, Wifi, WifiOff, Copy, Eye, FileText, CheckSquare
         } from 'lucide-react';
-        
-        import { 
-            BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, 
-            ResponsiveContainer, PieChart, Pie, Cell 
-        } from 'recharts';
+        import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
-        // ==========================================
-        //  TODO: 請在此處填入您的 Firebase 設定
-        // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyCVG3gmg7nx8DoQLWwUIZyPo3bdwt3lO-U",
             authDomain: "mrpms-8d731.firebaseapp.com",
@@ -109,346 +82,133 @@
             measurementId: "G-QFBSE9P7D3"
         };
 
-        // 檢查是否已設定 Firebase
-        let db = null;
-        let auth = null;
+        let db = null; let auth = null;
         const isFirebaseEnabled = firebaseConfig.apiKey !== undefined;
-
         if (isFirebaseEnabled) {
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-                signInAnonymously(auth)
-                    .then(() => console.log("匿名登入成功"))
-                    .catch((error) => console.error("匿名登入失敗:", error));
-                console.log("Firebase 已連線");
-            } catch (e) {
-                console.error("Firebase 初始化失敗:", e);
-            }
-        } else {
-            console.log("未偵測到 Firebase Config，使用模擬資料模式");
-        }
+                signInAnonymously(auth).then(() => console.log("Silent Login Success")).catch((e) => console.error("Login Failed:", e));
+                console.log("Firebase Connected");
+            } catch (e) { console.error("Firebase Init Failed:", e); }
+        } else { console.log("Mock Mode"); }
 
-        // ==========================================
-        //  工具函式
-        // ==========================================
-        const getLocalYYYYMMDD = () => {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        };
-
-        const formatDateTime = (isoString) => {
-            if (!isoString) return '-';
-            const date = new Date(isoString);
-            if (isNaN(date.getTime())) return isoString;
-            return date.toLocaleString('zh-TW', {
-                year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit', hour12: false
-            }).replace(/\//g, '-');
-        };
-
+        const getLocalYYYYMMDD = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; };
+        const formatDateTime = (iso) => { if (!iso) return '-'; const d = new Date(iso); return isNaN(d.getTime()) ? iso : d.toLocaleString('zh-TW', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false}).replace(/\//g, '-'); };
         const escapeCsv = (txt) => `"${String(txt || '').replace(/"/g, '""')}"`;
-        const splitCsvLine = (line) => {
-            const result = [];
-            let start = 0;
-            let inQuotes = false;
-            for (let i = 0; i < line.length; i++) {
-                if (line[i] === '"') { inQuotes = !inQuotes; }
-                else if (line[i] === ',' && !inQuotes) {
-                    let field = line.substring(start, i);
-                    if (field.startsWith('"') && field.endsWith('"')) field = field.slice(1, -1).replace(/""/g, '"');
-                    result.push(field);
-                    start = i + 1;
-                }
-            }
-            let lastField = line.substring(start);
-            if (lastField.startsWith('"') && lastField.endsWith('"')) lastField = lastField.slice(1, -1).replace(/""/g, '"');
-            result.push(lastField);
-            return result;
-        };
 
-        // ==========================================
-        //  常數定義
-        // ==========================================
         const DEPARTMENTS = ['EE', 'PPM', 'ME', 'SID', 'RF', 'EMI', 'CSC', 'Thermal', 'Other']; 
-        
-        const STATUS_OPTIONS = [
-            { value: 'NEW', label: '新進案件', color: 'bg-gray-100 text-gray-800' },
-            { value: 'ASSIGNED', label: '已指派', color: 'bg-blue-100 text-blue-800' },
-            { value: 'REPAIRING', label: '改機中', color: 'bg-purple-100 text-purple-800' }, 
-            { value: 'READY', label: '待領回', color: 'bg-emerald-100 text-emerald-800' },
-            { value: 'CLOSED', label: '已結案', color: 'bg-green-100 text-green-800' },
-        ];
+        const STATUS_OPTIONS = [ { value: 'NEW', label: '新進案件', color: 'bg-gray-100 text-gray-800' }, { value: 'ASSIGNED', label: '已指派', color: 'bg-blue-100 text-blue-800' }, { value: 'REPAIRING', label: '改機中', color: 'bg-purple-100 text-purple-800' }, { value: 'READY', label: '待領回', color: 'bg-emerald-100 text-emerald-800' }, { value: 'CLOSED', label: '已結案', color: 'bg-green-100 text-green-800' } ];
+        const INITIAL_ORDERS = [ { id: '1', case_no: 'RP-001', source_dept: 'EE', requester_name: '張大山', extension: '1234', machine_serial: 'SN-9988', machine_model: 'CNC-2000', inbound_date: '2026-01-10', created_at: '2026-01-10T09:30:00.000Z', updated_at: '2026-01-14T10:00:00.000Z', status: 'REPAIRING', current_owner: '陳技術員', issue_description: '主軸異音', eta_date: '2026-01-15', requester_eta_date: '2026-01-14', priority: 'NORMAL', is_overdue: false, maintenance_note: '初步檢查為主軸培林磨損。' } ];
+        const DEFAULT_TECHNICIANS = [ { name: '陳技術員', username: 'asus', password: 'asus' }, { name: '林技師', username: 'lin', password: '123' }, { name: '黃工程師', username: 'huang', password: '123' } ];
 
-        const INITIAL_ORDERS = [
-            { id: '1', case_no: 'RP-001', source_dept: 'EE', requester_name: '張大山', extension: '1234', machine_serial: 'SN-9988', machine_model: 'CNC-2000', inbound_date: '2026-01-10', created_at: '2026-01-10T09:30:00.000Z', updated_at: '2026-01-14T10:00:00.000Z', status: 'REPAIRING', current_owner: '陳技術員', issue_description: '主軸異音', eta_date: '2026-01-15', requester_eta_date: '2026-01-14', priority: 'NORMAL', is_overdue: false, maintenance_note: '初步檢查為主軸培林磨損。' },
-            { id: '2', case_no: 'RP-002', source_dept: 'ME', requester_name: '李小美', extension: '5678', machine_serial: 'SN-7766', machine_model: 'SMT-A500', inbound_date: '2026-01-12', created_at: '2026-01-12T14:15:00.000Z', updated_at: '2026-01-12T14:20:00.000Z', status: 'NEW', current_owner: '未指派', issue_description: '吸嘴異常', eta_date: '2026-01-14', requester_eta_date: '2026-01-13', priority: 'URGENT', is_overdue: false, maintenance_note: '' },
-            { id: '3', case_no: 'RP-003', source_dept: 'PPM', requester_name: '王五', extension: '9012', machine_serial: 'SN-1122', machine_model: 'Press-50T', inbound_date: '2026-01-05', created_at: '2026-01-05T08:00:00.000Z', updated_at: '2026-01-10T16:00:00.000Z', status: 'CLOSED', current_owner: '林技師', issue_description: '漏油', eta_date: '2026-01-10', requester_eta_date: '2026-01-09', priority: 'NORMAL', is_overdue: true, maintenance_note: '更換油封完畢，測試正常。' },
-        ];
+        const Toast = ({ message, type, onClose }) => { useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, [onClose]); const bg = type === 'success' ? 'bg-emerald-600' : 'bg-red-600'; return (<div className={`fixed top-4 right-4 z-[60] ${bg} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in-right`}>{type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}<span className="font-medium">{message}</span><button onClick={onClose}><X size={16}/></button></div>); };
+        const StatusBadge = ({ status }) => { const opt = STATUS_OPTIONS.find(o => o.value === status) || STATUS_OPTIONS[0]; return <span className={`px-2 py-1 rounded-full text-xs font-medium ${opt.color}`}>{opt.label}</span>; };
+        const PriorityBadge = ({ priority }) => priority === 'URGENT' ? <span className="flex items-center px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-600 animate-pulse"><Flame size={12} className="mr-1" /> 急件</span> : <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-100">一般</span>;
+        const NewBadge = () => <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-2 font-bold animate-pulse">NEW</span>;
+        const KPICard = ({ title, value, icon: Icon, colorClass, onClick }) => (<div onClick={onClick} className={`bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between transition-all ${onClick ? 'cursor-pointer hover:shadow-md hover:border-blue-300' : ''}`}><div><p className="text-sm text-gray-500 mb-1">{title}</p><h3 className="text-2xl font-bold text-gray-800">{value}</h3></div><div className={`p-3 rounded-lg ${colorClass}`}><Icon className="w-6 h-6 text-white" /></div></div>);
+        const Modal = ({ isOpen, onClose, title, children }) => { if (!isOpen) return null; return (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4"><div id="detail-modal-content" className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-fade-in-up"><div className="p-4 border-b flex justify-between items-center bg-gray-50 no-print"><h2 className="text-lg font-bold text-gray-800">{title}</h2><button type="button" onClick={onClose} className="p-1 hover:bg-gray-200 rounded-full text-gray-500"><X size={20} /></button></div><div className="p-6 overflow-y-auto flex-1">{children}</div></div></div>); };
 
-        // 預設工程師名單
-        const DEFAULT_TECHNICIANS = [
-            { name: '陳技術員', username: 'asus', password: 'asus' }, 
-            { name: '林技師', username: 'lin', password: '123' },
-            { name: '黃工程師', username: 'huang', password: '123' },
-            { name: '張專員', username: 'chang', password: '123' },
-            { name: '李組長', username: 'lee', password: '123' }
-        ];
-
-        // ==========================================
-        //  React Components
-        // ==========================================
-
-        const Toast = ({ message, type, onClose }) => {
-            useEffect(() => {
-                const timer = setTimeout(onClose, 3000);
-                return () => clearTimeout(timer);
-            }, [onClose]);
-            const bgClass = type === 'success' ? 'bg-emerald-600' : 'bg-red-600';
-            return (
-                <div className={`fixed top-4 right-4 z-50 ${bgClass} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in-right`}>
-                    {type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-                    <span className="font-medium">{message}</span>
-                    <button onClick={onClose} className="ml-2 hover:bg-white/20 rounded-full p-1"><X size={16}/></button>
-                </div>
-            );
-        };
-
-        const StatusBadge = ({ status }) => {
-            const option = STATUS_OPTIONS.find(o => o.value === status) || STATUS_OPTIONS[0];
-            return (
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${option.color}`}>
-                    {option.label}
-                </span>
-            );
-        };
-
-        const PriorityBadge = ({ priority }) => {
-            if (priority === 'URGENT') {
-                return (
-                    <span className="flex items-center px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-600 animate-pulse">
-                        <Flame className="w-3 h-3 mr-1" /> 急件
-                    </span>
-                );
-            }
-            return (
-                <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-100">
-                    一般
-                </span>
-            );
-        };
-
-        const KPICard = ({ title, value, icon: Icon, colorClass, trend, onClick }) => {
-            return (
-                <div 
-                    onClick={onClick}
-                    className={`bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between hover:shadow-md transition-all ${onClick ? 'cursor-pointer hover:border-blue-300' : ''}`}
-                >
-                    <div>
-                        <p className="text-sm text-gray-500 mb-1">{title}</p>
-                        <h3 className="text-2xl font-bold text-gray-800">{value}</h3>
-                        {trend && <span className="text-xs text-gray-400">{trend}</span>}
-                    </div>
-                    <div className={`p-3 rounded-lg ${colorClass}`}>
-                        <Icon className="w-6 h-6 text-white" />
-                    </div>
-                </div>
-            );
-        };
-
-        const Modal = ({ isOpen, onClose, title, children }) => {
-            if (!isOpen) return null;
-            return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
-                    <div id="detail-modal-content" className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-fade-in-up">
-                        <div className="p-4 border-b flex justify-between items-center bg-gray-50 no-print">
-                            <h2 className="text-lg font-bold text-gray-800">{title}</h2>
-                            <button type="button" onClick={onClose} className="p-1 hover:bg-gray-200 rounded-full text-gray-500 transition-colors">
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="p-6 overflow-y-auto flex-1">
-                            {children}
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        // --- 主應用程式 ---
         const MRPMS = () => {
             const [activeTab, setActiveTab] = useState('dashboard');
             const [orders, setOrders] = useState([]); 
             const [searchQuery, setSearchQuery] = useState('');
             const [statusFilter, setStatusFilter] = useState('UNFINISHED'); 
             const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' }); 
-            
-            // 預設角色改為 PUBLIC
             const [currentUserRole, setCurrentUserRole] = useState('PUBLIC'); 
             const [currentTechName, setCurrentTechName] = useState(''); 
             const [currentTechUsername, setCurrentTechUsername] = useState(''); 
             const [currentTechId, setCurrentTechId] = useState(''); 
             const [toast, setToast] = useState(null); 
-
-            // Modal States
             const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
             const [isAddModalOpen, setIsAddModalOpen] = useState(false);
             const [isTechModalOpen, setIsTechModalOpen] = useState(false); 
             const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
             const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
             const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false); 
-            
             const [editForm, setEditForm] = useState(null);
             const [loading, setLoading] = useState(true);
             const fileInputRef = useRef(null); 
-
-            // 登入表單 State
             const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-            // 修改密碼表單
             const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
-
-            // 人員管理 State
             const [technicians, setTechnicians] = useState([]);
             const [newTechForm, setNewTechForm] = useState({ name: '', username: '', password: '' });
-
-            // 前台查詢 State
             const [searchExtension, setSearchExtension] = useState('');
             const [searchResults, setSearchResults] = useState(null);
+            const [newOrderForm, setNewOrderForm] = useState({ case_no: '', source_dept: DEPARTMENTS[0], custom_source_dept: '', requester_name: '', extension: '', machine_serial: '', machine_model: '', issue_description: '', requester_eta_date: '', eta_date: '', priority: 'NORMAL', maintenance_note: '', quantity: 1 });
 
-            const [newOrderForm, setNewOrderForm] = useState({
-                case_no: '',
-                source_dept: DEPARTMENTS[0],
-                custom_source_dept: '', 
-                requester_name: '',
-                extension: '', 
-                machine_serial: '',
-                machine_model: '', 
-                issue_description: '',
-                requester_eta_date: '', 
-                eta_date: '', 
-                priority: 'NORMAL',
-                maintenance_note: '',
-                quantity: 1 
-            });
+            const showToast = (message, type = 'success') => setToast({ message, type });
 
-            const showToast = (message, type = 'success') => {
-                setToast({ message, type });
-            };
-
-            // 資料載入邏輯
             useEffect(() => {
-                let unsubscribeOrders = null;
-                let unsubscribeTechs = null;
-
+                let unsubscribeOrders, unsubscribeTechs;
                 if (isFirebaseEnabled && db && auth) {
-                    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+                    onAuthStateChanged(auth, (user) => {
                         if (user) {
-                            console.log("目前使用者 ID:", user.uid);
-                            
-                            // 1. 監聽工單
-                            const q = query(collection(db, "work_orders"), orderBy("created_at", "desc"));
-                            unsubscribeOrders = onSnapshot(q, (querySnapshot) => {
-                                const firebaseOrders = querySnapshot.docs.map(doc => ({
-                                    id: doc.id,
-                                    ...doc.data()
-                                }));
-                                setOrders(firebaseOrders);
-                                setLoading(false);
-                            }, (error) => {
-                                console.error("Orders Error:", error);
+                            unsubscribeOrders = onSnapshot(query(collection(db, "work_orders"), orderBy("created_at", "desc")), (qs) => {
+                                setOrders(qs.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                                 setLoading(false);
                             });
-
-                            // 2. 監聽人員
-                            const techQuery = collection(db, "technicians");
-                            unsubscribeTechs = onSnapshot(techQuery, async (snapshot) => {
-                                if (snapshot.empty) {
-                                    // Seeding
-                                    for (const tech of DEFAULT_TECHNICIANS) {
-                                        await addDoc(techQuery, tech);
-                                    }
+                            unsubscribeTechs = onSnapshot(collection(db, "technicians"), async (qs) => {
+                                if (qs.empty) {
+                                    for (const tech of DEFAULT_TECHNICIANS) await addDoc(collection(db, "technicians"), tech);
                                 } else {
-                                    const loadedTechs = snapshot.docs.map(doc => ({
-                                        id: doc.id,
-                                        ...doc.data()
-                                    }));
-                                    setTechnicians(loadedTechs);
+                                    setTechnicians(qs.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                                 }
                             });
-
-                        } else {
-                            console.log("使用者未登入");
-                            setLoading(false); 
-                        }
+                        } else setLoading(false);
                     });
-
-                    return () => {
-                        unsubscribeAuth();
-                        if (unsubscribeOrders) unsubscribeOrders();
-                        if (unsubscribeTechs) unsubscribeTechs();
-                    };
                 } else {
-                    // 模擬模式
                     setTimeout(() => {
                         setOrders(INITIAL_ORDERS);
                         const savedTechs = localStorage.getItem('mrpms_technicians');
-                        if (savedTechs) {
-                            setTechnicians(JSON.parse(savedTechs));
-                        } else {
-                            setTechnicians(DEFAULT_TECHNICIANS);
-                            localStorage.setItem('mrpms_technicians', JSON.stringify(DEFAULT_TECHNICIANS));
-                        }
+                        setTechnicians(savedTechs ? JSON.parse(savedTechs) : DEFAULT_TECHNICIANS);
                         setLoading(false);
                     }, 500);
                 }
+                return () => { if (unsubscribeOrders) unsubscribeOrders(); if (unsubscribeTechs) unsubscribeTechs(); };
             }, []);
 
-            // Login Logic
             const handleLogin = (e) => {
                 e.preventDefault();
                 const { username, password } = loginForm;
-                
                 if (username === '25619' && password === '25619') {
-                    setCurrentUserRole('ADMIN');
-                    setCurrentTechName('Admin');
-                    setIsLoginModalOpen(false);
-                    showToast("登入成功：最高權限管理者");
-                    setLoginForm({ username: '', password: '' });
-                    return;
+                    setCurrentUserRole('ADMIN'); setCurrentTechName('Admin'); setIsLoginModalOpen(false); showToast("登入成功：管理者"); setLoginForm({ username: '', password: '' }); return;
                 }
-
                 const tech = technicians.find(t => t.username === username && t.password === password);
                 if (tech) {
-                    setCurrentUserRole('ENGINEER');
-                    setCurrentTechName(tech.name); 
-                    setCurrentTechUsername(tech.username);
-                    setCurrentTechId(tech.id);
-                    setIsLoginModalOpen(false);
-                    showToast(`登入成功：${tech.name}`);
-                } else {
-                    showToast("帳號或密碼錯誤", "error");
-                }
+                    setCurrentUserRole('ENGINEER'); setCurrentTechName(tech.name); setCurrentTechUsername(tech.username); setCurrentTechId(tech.id); setIsLoginModalOpen(false); showToast(`登入成功：${tech.name}`);
+                } else { showToast("帳號或密碼錯誤", "error"); }
                 setLoginForm({ username: '', password: '' });
             };
 
             const handleLogout = () => {
+                setIsLoginModalOpen(false);
                 setCurrentUserRole('PUBLIC');
                 setCurrentTechName('');
                 setCurrentTechUsername('');
                 setActiveTab('dashboard');
-                setIsLoginModalOpen(false); 
-                showToast("已登出");
+                showToast("已登出 / 返回前台");
+            };
+
+            const handleAddTechnician = async () => {
+                if (!newTechForm.name || !newTechForm.username || !newTechForm.password) { showToast("請填寫完整資訊", "error"); return; }
+                if (isFirebaseEnabled && db) {
+                    try { await addDoc(collection(db, "technicians"), newTechForm); showToast("已新增人員"); } catch(e) { showToast("新增失敗", "error"); }
+                } else {
+                    const updated = [...technicians, { ...newTechForm }]; setTechnicians(updated); localStorage.setItem('mrpms_technicians', JSON.stringify(updated)); showToast("已新增 (模擬)");
+                }
+                setNewTechForm({ name: '', username: '', password: '' });
+            };
+            const handleDeleteTechnician = async (techId, techUsername) => {
+                if (!confirm(`確定要刪除 ${techUsername} 嗎?`)) return;
+                if (isFirebaseEnabled && db) { try { await deleteDoc(doc(db, "technicians", techId)); showToast("已刪除"); } catch(e) { showToast("刪除失敗", "error"); } }
+                else { const updated = technicians.filter(t => t.username !== techUsername); setTechnicians(updated); localStorage.setItem('mrpms_technicians', JSON.stringify(updated)); showToast("已刪除 (模擬)"); }
             };
 
             const handleExportPDF = async () => {
-                const element = document.getElementById('dashboard-content');
-                if (!element) { showToast("找不到儀表板", "error"); return; }
-                showToast("正在生成 PDF...");
-                await new Promise(r => setTimeout(r, 800));
+                const element = document.getElementById('dashboard-content'); if (!element) return;
+                showToast("生成 PDF 中..."); await new Promise(r => setTimeout(r, 800));
                 try {
                     const canvas = await window.html2canvas(element, { scale: 2, useCORS: true, onclone: (cloned) => { const el = cloned.getElementById('dashboard-content'); if(el) el.style.width='1280px'; } });
                     const imgData = canvas.toDataURL('image/png');
@@ -458,8 +218,7 @@
                     const props = pdf.getImageProperties(imgData);
                     const h = (props.height * w) / props.width;
                     pdf.addImage(imgData, 'PNG', 0, 0, w, h);
-                    pdf.save(`MRPMS_Dashboard_${getLocalYYYYMMDD()}.pdf`);
-                    showToast("PDF 下載成功");
+                    pdf.save(`MRPMS_Dashboard_${getLocalYYYYMMDD()}.pdf`); showToast("PDF 下載成功");
                 } catch (e) { console.error(e); showToast("PDF 失敗", "error"); }
             };
 
@@ -468,93 +227,52 @@
                 const orderRows = orders.map(o => `ORDER,${escapeCsv(o.id)},${escapeCsv(o.case_no)},${escapeCsv(o.source_dept)},${escapeCsv(o.requester_name)},${escapeCsv(o.extension)},${escapeCsv(o.machine_serial)},${escapeCsv(o.machine_model)},${escapeCsv(o.issue_description)},${escapeCsv(o.requester_eta_date)},${escapeCsv(o.eta_date)},${escapeCsv(o.priority)},${escapeCsv(o.maintenance_note)},${escapeCsv(o.inbound_date)},${escapeCsv(o.status)},${escapeCsv(o.current_owner)},${escapeCsv(o.is_overdue)},${escapeCsv(o.created_at)}`);
                 const csvContent = "\uFEFF" + "TYPE,DATA_COLUMNS...\n" + techRows.join("\n") + "\n" + orderRows.join("\n");
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.setAttribute("href", url); link.setAttribute("download", `MRPMS_Backup_${getLocalYYYYMMDD()}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); showToast("備份成功");
+                const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.setAttribute("href", url); link.setAttribute("download", `MRPMS_System_Backup_${getLocalYYYYMMDD()}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); showToast("系統備份成功！");
             };
-
-            const handleSystemRestore = (e) => { /* Omitted for brevity */ };
-            const handleChangePassword = async (e) => { 
-                e.preventDefault(); if (passwordForm.newPassword !== passwordForm.confirmPassword) { showToast("密碼不一致", "error"); return; }
-                if (isFirebaseEnabled && db && currentTechId) {
-                    await updateDoc(doc(db, "technicians", currentTechId), { password: passwordForm.newPassword });
-                    showToast("密碼修改成功 (已儲存)");
-                } else {
-                    const updated = technicians.map(t => t.username === currentTechUsername ? { ...t, password: passwordForm.newPassword } : t);
-                    setTechnicians(updated);
-                    localStorage.setItem('mrpms_technicians', JSON.stringify(updated));
-                    showToast("密碼修改成功 (模擬)");
-                }
-                setIsChangePasswordModalOpen(false); setPasswordForm({ newPassword: '', confirmPassword: '' });
+            const handleSystemRestore = (event) => { 
+                const file = event.target.files[0]; if(!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const lines = e.target.result.split('\n');
+                    const newTechs = []; const newOrders = [];
+                    lines.forEach(l => {
+                        if(!l.trim() || l.startsWith('TYPE')) return;
+                        const c = splitCsvLine(l);
+                        if(c[0]==='TECH') newTechs.push({name:c[1], username:c[2], password:c[3]});
+                        else if(c[0]==='ORDER') newOrders.push({id:c[1], case_no:c[2], source_dept:c[3], requester_name:c[4], extension:c[5], machine_serial:c[6], machine_model:c[7], issue_description:c[8], requester_eta_date:c[9], eta_date:c[10], priority:c[11], maintenance_note:c[12], inbound_date:c[13], status:c[14], current_owner:c[15], is_overdue:c[16]==='true', created_at:c[17]});
+                    });
+                    setTechnicians(newTechs); setOrders(newOrders); showToast("還原成功");
+                };
+                reader.readAsText(file);
             };
-
+            const handleChangePassword = async (e) => { e.preventDefault(); if (passwordForm.newPassword !== passwordForm.confirmPassword) { showToast("密碼不一致", "error"); return; } if (isFirebaseEnabled && db && currentTechId) { await updateDoc(doc(db, "technicians", currentTechId), { password: passwordForm.newPassword }); } else { const updated = technicians.map(t => t.username === currentTechUsername ? { ...t, password: passwordForm.newPassword } : t); setTechnicians(updated); localStorage.setItem('mrpms_technicians', JSON.stringify(updated)); } setIsChangePasswordModalOpen(false); showToast("密碼修改成功"); setPasswordForm({ newPassword: '', confirmPassword: '' }); };
+            
             const handleOpenDetail = (order) => { const isStandardDept = DEPARTMENTS.includes(order.source_dept); setEditForm({ ...order, source_dept: isStandardDept ? order.source_dept : 'Other', custom_source_dept: isStandardDept ? '' : order.source_dept }); setIsDetailModalOpen(true); };
             const handleEditFormChange = (e) => { const { name, value } = e.target; setEditForm(prev => ({ ...prev, [name]: value })); };
             
-            // 修正 2: 更新工單並自動切換狀態
             const handleUpdateOrder = async () => {
                 if (!editForm) return;
                 const finalSourceDept = editForm.source_dept === 'Other' ? (editForm.custom_source_dept || 'Other') : editForm.source_dept;
-                
-                // 自動狀態切換邏輯
-                let newStatus = editForm.status;
-                if (editForm.current_owner !== '未指派' && newStatus === 'NEW') {
-                    newStatus = 'ASSIGNED';
-                }
-
-                const updateData = { 
-                    source_dept: finalSourceDept, 
-                    status: newStatus, 
-                    current_owner: editForm.current_owner, 
-                    eta_date: editForm.eta_date, 
-                    priority: editForm.priority, 
-                    maintenance_note: editForm.maintenance_note || '',
-                    updated_at: new Date().toISOString() 
-                };
-
-                if (isFirebaseEnabled && db) {
-                    try { await updateDoc(doc(db, "work_orders", editForm.id), updateData); showToast("工單更新成功！"); setIsDetailModalOpen(false); } catch (error) { showToast("更新失敗: " + error.message, "error"); }
-                } else {
-                    setOrders(prev => prev.map(o => o.id === editForm.id ? {...editForm, ...updateData} : o)); showToast("更新成功 (模擬模式)"); setIsDetailModalOpen(false);
-                }
+                const newStatus = (editForm.current_owner !== '未指派' && editForm.status === 'NEW') ? 'ASSIGNED' : editForm.status;
+                const updateData = { ...editForm, source_dept: finalSourceDept, status: newStatus, updated_at: new Date().toISOString() };
+                if (isFirebaseEnabled && db) { try { await updateDoc(doc(db, "work_orders", editForm.id), updateData); showToast("工單更新成功"); } catch(e) { showToast("更新失敗", "error"); } } else { setOrders(prev => prev.map(o => o.id === editForm.id ? updateData : o)); showToast("工單更新成功 (模擬)"); }
+                setIsDetailModalOpen(false);
             };
 
-            // 修正 1: 還原我要承接邏輯
             const handleSelfAssign = async () => { 
                 if (!editForm || currentUserRole !== 'ENGINEER') return; 
-                const updatePayload = { current_owner: currentTechName, status: 'ASSIGNED', updated_at: new Date().toISOString() };
-                
-                // UI Optimistic Update
-                setEditForm(prev => ({ ...prev, ...updatePayload }));
-
-                if (isFirebaseEnabled && db) {
-                    try {
-                        await updateDoc(doc(db, "work_orders", editForm.id), updatePayload);
-                        showToast(`承接成功！已更新負責人為 ${currentTechName}`);
-                    } catch (error) { showToast("承接失敗: " + error.message, "error"); }
-                } else {
-                    setOrders(prev => prev.map(o => o.id === editForm.id ? { ...o, ...updatePayload } : o));
-                    showToast("承接成功 (模擬模式)");
-                }
+                const updateData = { current_owner: currentTechName, status: 'ASSIGNED', updated_at: new Date().toISOString() };
+                setEditForm(prev => ({ ...prev, ...updateData }));
+                if (isFirebaseEnabled && db) { await updateDoc(doc(db, "work_orders", editForm.id), updateData); showToast(`承接成功: ${currentTechName}`); } else { setOrders(prev => prev.map(o => o.id === editForm.id ? {...o, ...updateData} : o)); showToast("承接成功 (模擬)"); }
             };
 
-            // 修正 1: 還原刪除工單邏輯
-            const handleDeleteOrder = async () => { 
-                if (!editForm || currentUserRole !== 'ADMIN') return; 
-                if (!confirm(`確定要刪除工單 ${editForm.case_no} 嗎？`)) return; 
-                if (isFirebaseEnabled && db) { 
-                    try { await deleteDoc(doc(db, "work_orders", editForm.id)); showToast("已刪除"); setIsDetailModalOpen(false); } catch(e){showToast("刪除失敗","error");} 
-                } else { 
-                    setOrders(prev => prev.filter(o => o.id !== editForm.id)); showToast("已刪除"); setIsDetailModalOpen(false); 
-                } 
-            };
-
+            const handleDeleteOrder = async () => { if (!editForm || currentUserRole !== 'ADMIN') return; if (!confirm("確定刪除?")) return; if (isFirebaseEnabled && db) { await deleteDoc(doc(db, "work_orders", editForm.id)); showToast("已刪除"); } else { setOrders(prev => prev.filter(o => o.id !== editForm.id)); showToast("已刪除"); } setIsDetailModalOpen(false); };
             const handlePrintOrder = () => window.print();
-            const requestSort = (key) => { let d = 'ascending'; if (sortConfig.key === key && sortConfig.direction === 'ascending') d = 'descending'; setSortConfig({ key, direction: d }); };
-            
-            // 修正 1: 還原匯出 CSV
+            const requestSort = (key) => { setSortConfig({ key, direction: sortConfig.key === key && sortConfig.direction === 'ascending' ? 'descending' : 'ascending' }); };
             const handleExportCSV = () => { 
-                if (filteredOrders.length === 0) { showToast("沒有資料可匯出", "error"); return; }
+                if (filteredOrders.length === 0) { showToast("無資料", "error"); return; }
                 const headers = ["工單編號", "來源單位", "送件人", "分機", "機台型號", "機台序號", "狀態", "負責人", "優先級", "建立日期", "期望完成日", "預計完工日"];
-                const csvRows = []; csvRows.push(headers.join(","));
+                const csvRows = [headers.join(",")];
                 filteredOrders.forEach(o => {
                     const row = [o.case_no, o.source_dept, o.requester_name, o.extension||'', o.machine_model, o.machine_serial, STATUS_OPTIONS.find(s=>s.value===o.status)?.label||o.status, o.current_owner, o.priority==='URGENT'?'急件':'一般', o.inbound_date, o.requester_eta_date, o.eta_date];
                     csvRows.push(row.map(s => `"${String(s||'').replace(/"/g, '""')}"`).join(","));
@@ -562,9 +280,9 @@
                 const blob = new Blob(["\uFEFF" + csvRows.join("\n")], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.setAttribute("href", url); link.setAttribute("download", `MRPMS_Export_${getLocalYYYYMMDD()}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); showToast("匯出成功");
             };
-            
+
             const handleAddFormChange = (e) => { const { name, value } = e.target; setNewOrderForm(prev => ({ ...prev, [name]: value })); };
-            const handleSubmitNewOrder = async (e) => { /* ... existing ... */ 
+            const handleSubmitNewOrder = async (e) => {
                 e.preventDefault();
                 if (!newOrderForm.requester_name.trim()) { showToast("請填寫送件人姓名", "error"); return; }
                 if (!newOrderForm.extension.trim()) { showToast("請填寫分機號碼", "error"); return; }
@@ -575,74 +293,47 @@
                     const newOrderData = { case_no: `RP-${today.replace(/-/g, '')}-${String(timestamp).slice(-4)}${uniqueSuffix}`, source_dept: finalSourceDept, requester_name: newOrderForm.requester_name, extension: newOrderForm.extension, machine_serial: newOrderForm.machine_serial || 'Unknown', machine_model: newOrderForm.machine_model || 'Unknown', issue_description: newOrderForm.issue_description, requester_eta_date: newOrderForm.requester_eta_date || '', eta_date: '', priority: newOrderForm.priority, maintenance_note: '', inbound_date: today, status: 'NEW', current_owner: '未指派', is_overdue: false, created_at: createdTime, updated_at: createdTime };
                     if (isFirebaseEnabled && db) batchPromises.push(addDoc(collection(db, "work_orders"), newOrderData)); else newLocalOrders.push({id: `mock-${timestamp}-${i}`, ...newOrderData});
                 }
-                if (isFirebaseEnabled && db) { try { await Promise.all(batchPromises); showToast(`成功新增 ${qty} 筆！`); } catch (error) { showToast("新增失敗", "error"); return; } } else { setOrders(prev => [...newLocalOrders, ...prev]); showToast(`成功新增 ${qty} 筆 (模擬)`); }
+                if (isFirebaseEnabled && db) { try { await Promise.all(batchPromises); showToast(`成功新增 ${qty} 筆改機申請！`); } catch (error) { showToast("新增失敗", "error"); return; } } else { setOrders(prev => [...newLocalOrders, ...prev]); showToast(`成功新增 ${qty} 筆 (模擬)`); }
                 setIsAddModalOpen(false); setNewOrderForm({ case_no: '', source_dept: DEPARTMENTS[0], custom_source_dept: '', requester_name: '', extension: '', machine_serial: '', machine_model: '', issue_description: '', requester_eta_date: '', eta_date: '', priority: 'NORMAL', maintenance_note: '', quantity: 1 });
             };
+            const handleSearchByExtension = (e) => { e.preventDefault(); if(searchExtension.trim()) setSearchResults(orders.filter(o => o.extension === searchExtension && o.status !== 'CLOSED')); };
 
-            const handleSearchByExtension = (e) => { e.preventDefault(); if (!searchExtension.trim()) return; setSearchResults(orders.filter(o => o.extension === searchExtension && o.status !== 'CLOSED')); };
-            
-            // 修正 1: 還原新增/刪除人員邏輯
-            const handleAddTechnician = async () => {
-                if (newTechForm.name && newTechForm.username && newTechForm.password) {
-                    if (isFirebaseEnabled && db) { try { await addDoc(collection(db, "technicians"), newTechForm); showToast("已新增"); setNewTechForm({ name: '', username: '', password: '' }); } catch(e) { showToast("新增失敗", "error"); } } 
-                    else { const updated = [...technicians, { ...newTechForm }]; setTechnicians(updated); localStorage.setItem('mrpms_technicians', JSON.stringify(updated)); setNewTechForm({ name: '', username: '', password: '' }); showToast("已新增 (模擬)"); }
-                } else { showToast("請填寫完整資訊", "error"); }
-            };
-            const handleDeleteTechnician = async (techId, techUsername) => {
-                if (confirm(`確定要刪除 ${techUsername} 嗎?`)) {
-                    if (isFirebaseEnabled && db) { try { await deleteDoc(doc(db, "technicians", techId)); showToast("已刪除"); } catch(e) { showToast("刪除失敗", "error"); } }
-                    else { const updated = technicians.filter(t => t.username !== techUsername); setTechnicians(updated); localStorage.setItem('mrpms_technicians', JSON.stringify(updated)); showToast("已刪除 (模擬)"); }
-                }
-            };
-            
-            const handleKPIClick = (filterType) => { if (currentUserRole === 'GUEST') return; setActiveTab('list'); setStatusFilter(filterType); };
-
-            const stats = useMemo(() => { const todayStr = getLocalYYYYMMDD(); return { inbound: orders.filter(o => o.inbound_date === todayStr).length, wip: orders.filter(o => !['READY', 'CLOSED'].includes(o.status)).length, completed: orders.filter(o => o.status === 'READY' || o.status === 'CLOSED').length, overdue: orders.filter(o => o.is_overdue).length }; }, [orders]);
-            const chartData = useMemo(() => { const deptCount = {}; orders.forEach(o => { const dept = o.source_dept || '未知'; deptCount[dept] = (deptCount[dept] || 0) + 1; }); return Object.keys(deptCount).map(key => ({ name: key, value: deptCount[key] })); }, [orders]);
-            const techPerformanceData = useMemo(() => { const techStats = {}; const techNames = technicians.map(t => t.name); techNames.forEach(name => techStats[name] = { active: 0, completed: 0 }); orders.forEach(o => { if (o.current_owner && o.current_owner !== '未指派' && techStats[o.current_owner]) { if (['ASSIGNED', 'REPAIRING'].includes(o.status)) { techStats[o.current_owner].active += 1; } else if (['READY', 'CLOSED'].includes(o.status)) { techStats[o.current_owner].completed += 1; } } }); return Object.keys(techStats).map(key => ({ name: key, active: techStats[key].active, completed: techStats[key].completed })); }, [orders, technicians]);
-            const statusData = useMemo(() => { const statusOrder = ['NEW', 'ASSIGNED', 'REPAIRING', 'READY']; return statusOrder.map(s => ({ name: STATUS_OPTIONS.find(opt => opt.value === s)?.label || s, count: orders.filter(o => o.status === s).length })).filter(item => item.count > 0); }, [orders]);
+            const handleKPIClick = (filter) => { if (currentUserRole !== 'GUEST') { setActiveTab('list'); setStatusFilter(filter); } };
+            const stats = useMemo(() => { const today = getLocalYYYYMMDD(); return { inbound: orders.filter(o => o.inbound_date === today).length, wip: orders.filter(o => !['READY', 'CLOSED'].includes(o.status)).length, completed: orders.filter(o => o.status === 'READY' || o.status === 'CLOSED').length, overdue: orders.filter(o => o.is_overdue).length, completedToday: orders.filter(o => ['READY', 'CLOSED'].includes(o.status) && (o.updated_at && o.updated_at.startsWith(today))).length }; }, [orders]);
+            const techPerformanceData = useMemo(() => { const stats = {}; technicians.forEach(t => stats[t.name] = {active: 0, completed: 0}); orders.forEach(o => { if (stats[o.current_owner]) { if (['ASSIGNED', 'REPAIRING'].includes(o.status)) stats[o.current_owner].active++; else if (['READY', 'CLOSED'].includes(o.status)) stats[o.current_owner].completed++; } }); return Object.keys(stats).map(k => ({name: k, ...stats[k]})); }, [orders, technicians]);
+            const chartData = useMemo(() => { const counts = {}; orders.forEach(o => { const d = o.source_dept||'未知'; counts[d] = (counts[d]||0)+1; }); return Object.keys(counts).map(k => ({name: k, value: counts[k]})); }, [orders]);
+            const statusData = useMemo(() => ['NEW', 'ASSIGNED', 'REPAIRING', 'READY'].map(s => ({ name: STATUS_OPTIONS.find(o=>o.value===s)?.label||s, count: orders.filter(o=>o.status===s).length })).filter(i => i.count > 0), [orders]);
             const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1'];
-            const filteredOrders = useMemo(() => { 
-                let data = orders.filter(order => {
-                    const matchesSearch = (order.machine_serial || '').toLowerCase().includes(searchQuery.toLowerCase()) || (order.requester_name || '').includes(searchQuery) || (order.case_no || '').toLowerCase().includes(searchQuery.toLowerCase());
-                    if (!matchesSearch) return false;
-                    if (activeTab === 'my_orders') { if (order.current_owner !== currentTechName) return false; }
-                    if (statusFilter === 'ALL') return true;
-                    if (statusFilter === 'UNFINISHED') return !['READY', 'CLOSED'].includes(order.status);
-                    if (statusFilter === 'READY') return order.status === 'READY';
-                    if (statusFilter === 'CLOSED') return order.status === 'CLOSED';
-                    if (statusFilter === 'TODAY') return order.inbound_date === getLocalYYYYMMDD();
-                    if (statusFilter === 'OVERDUE') return order.is_overdue;
-                    if (statusFilter === 'TODAY_DONE') { const isDone = ['READY', 'CLOSED'].includes(order.status); if (!isDone) return false; if (order.updated_at) return order.updated_at.startsWith(getLocalYYYYMMDD()); return order.inbound_date === getLocalYYYYMMDD(); }
+
+            const filteredOrders = useMemo(() => {
+                let data = orders.filter(o => {
+                    const matchSearch = (o.machine_serial+o.requester_name+o.case_no).toLowerCase().includes(searchQuery.toLowerCase());
+                    if (!matchSearch) return false;
+                    if (activeTab === 'my_orders' && o.current_owner !== currentTechName) return false;
+                    if (statusFilter === 'UNFINISHED') return !['READY', 'CLOSED'].includes(o.status);
+                    if (statusFilter === 'READY') return o.status === 'READY';
+                    if (statusFilter === 'CLOSED') return o.status === 'CLOSED';
+                    if (statusFilter === 'TODAY') return o.inbound_date === getLocalYYYYMMDD();
+                    if (statusFilter === 'OVERDUE') return o.is_overdue;
+                    if (statusFilter === 'TODAY_DONE') return ['READY', 'CLOSED'].includes(o.status) && o.updated_at?.startsWith(getLocalYYYYMMDD());
                     return true;
                 });
-                if (sortConfig.key) { data.sort((a, b) => { if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'ascending' ? -1 : 1; if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'ascending' ? 1 : -1; return 0; }); }
-                return data;
+                return data.sort((a,b) => (a[sortConfig.key] < b[sortConfig.key] ? 1 : -1) * (sortConfig.direction === 'ascending' ? -1 : 1));
             }, [orders, searchQuery, statusFilter, sortConfig, activeTab, currentTechName]);
 
             const SortableHeader = ({ label, sortKey, align = 'left' }) => ( <th className={`p-4 font-medium cursor-pointer hover:bg-gray-100 transition-colors text-${align}`} onClick={() => requestSort(sortKey)}><div className={`flex items-center ${align === 'right' ? 'justify-end' : ''}`}>{label}<ArrowUpDown className="w-3 h-3 ml-1 text-gray-400" /></div></th> );
 
-            if (loading) return ( <div className="flex h-screen items-center justify-center bg-gray-50 text-gray-500"><div className="flex flex-col items-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>載入系統資料中...</div></div> );
+            if (loading) return <div className="flex h-screen items-center justify-center bg-gray-50 text-gray-500">載入中...</div>;
 
-            // Kiosk View
             if (currentUserRole === 'PUBLIC') {
                 return (
                     <div className="min-h-screen bg-slate-50 flex flex-col">
                         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-                        <header className="bg-slate-900 text-white p-4 shadow-md flex justify-between items-center">
-                             <div className="flex items-center gap-2"><Settings className="w-8 h-8 text-blue-400" /><div><h1 className="text-xl font-bold tracking-tight">MRPMS 改機申請平台</h1><p className="text-xs text-slate-400">前台填單專用 (Kiosk)</p></div></div>
-                            <button type="button" onClick={() => setCurrentUserRole('GUEST')} className="flex items-center text-slate-300 hover:text-white text-xs px-3 py-1 border border-slate-700 rounded transition-colors bg-slate-800"><LogIn className="w-4 h-4 mr-1" /> 後台管理</button>
-                        </header>
+                        <header className="bg-slate-900 text-white p-4 shadow-md flex justify-between items-center"><div className="flex items-center gap-2"><Settings className="w-8 h-8 text-blue-400" /><div><h1 className="text-xl font-bold tracking-tight">MRPMS 改機申請平台</h1><p className="text-xs text-slate-400">前台填單專用 (Kiosk)</p></div></div><button type="button" onClick={() => setCurrentUserRole('GUEST')} className="flex items-center text-slate-300 hover:text-white text-xs px-3 py-1 border border-slate-700 rounded transition-colors bg-slate-800"><LogIn className="w-4 h-4 mr-1" /> 後台管理</button></header>
                         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-6">
-                            <div className="bg-white p-10 rounded-2xl shadow-xl border border-gray-100 max-w-lg w-full">
-                                <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6"><ClipboardList className="w-10 h-10" /></div>
-                                <h2 className="text-3xl font-bold text-gray-800 mb-2">機台改機申請</h2>
-                                <p className="text-gray-500 mb-8">請點擊下方按鈕填寫新的改機工單。填寫完畢後，系統將自動通知技術人員。</p>
-                                <button type="button" onClick={() => setIsAddModalOpen(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold py-4 rounded-xl shadow-lg transform hover:scale-105 transition-all flex items-center justify-center"><Plus className="w-6 h-6 mr-2" /> 填寫改機單</button>
-                            </div>
+                            <div className="bg-white p-10 rounded-2xl shadow-xl border border-gray-100 max-w-lg w-full"><div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6"><ClipboardList className="w-10 h-10" /></div><h2 className="text-3xl font-bold text-gray-800 mb-2">機台改機申請</h2><p className="text-gray-500 mb-8">請點擊下方按鈕填寫新的改機工單。</p><button type="button" onClick={() => setIsAddModalOpen(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold py-4 rounded-xl shadow-lg transform hover:scale-105 transition-all flex items-center justify-center"><Plus className="w-6 h-6 mr-2" /> 填寫改機單</button></div>
                             <button type="button" onClick={() => setIsSearchModalOpen(true)} className="flex items-center text-slate-500 hover:text-blue-600 text-sm font-medium px-4 py-2 border border-slate-300 rounded-full hover:bg-white transition-colors bg-slate-100"><Search className="w-4 h-4 mr-2" /> 查詢進度 (依分機)</button>
-                            <div className="text-xs text-slate-400 mt-8 flex items-center justify-center gap-2">今日收件: {stats.inbound} | {isFirebaseEnabled ? <span className="flex items-center text-emerald-500 font-bold"><div className="w-2 h-2 bg-emerald-500 rounded-full mr-1"></div> 正常</span> : <span className="flex items-center text-red-500 font-bold"><AlertCircle className="w-3 h-3 mr-1" /> 未連線</span>}</div>
-                            <div className="text-[10px] text-slate-300">系統維護 Finn_huang #25619</div>
+                            <div className="text-xs text-slate-400 mt-8 flex items-center justify-center gap-2">今日收件: {stats.inbound} | {isFirebaseEnabled ? <span className="flex items-center text-emerald-500 font-bold"><div className="w-2 h-2 bg-emerald-500 rounded-full mr-1"></div> 正常</span> : <span className="flex items-center text-red-500 font-bold"><AlertCircle className="w-3 h-3 mr-1" /> 未連線</span>}</div><div className="text-[10px] text-slate-300">系統維護 Finn_huang #25619</div>
                         </div>
                         {/* Modals for Kiosk */}
                         <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="新增改機工單">
@@ -695,75 +386,18 @@
                     {/* Sidebar */}
                     <aside className="w-64 bg-slate-900 text-white flex flex-col shadow-xl no-print">
                         <div className="p-6 border-b border-slate-700"><div className="flex items-center gap-2"><Settings className="w-8 h-8 text-blue-400" /><div><h1 className="text-xl font-bold tracking-tight">MRPMS</h1><p className="text-xs text-slate-400">Pure HTML 版</p></div></div></div>
-                        <div className="flex-1 overflow-y-auto">
-                            <nav className="p-4 space-y-2">
-                                <button type="button" onClick={() => setActiveTab('dashboard')} className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-blue-600' : 'hover:bg-slate-800'}`}><LayoutDashboard className="w-5 h-5 mr-3" /> 戰情看板</button>
-                                {currentUserRole !== 'GUEST' && (<><button type="button" onClick={() => setActiveTab('list')} className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${activeTab === 'list' ? 'bg-blue-600' : 'hover:bg-slate-800'}`}><ListTodo className="w-5 h-5 mr-3" /> 工單管理</button><button type="button" onClick={() => setActiveTab('my_orders')} className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${activeTab === 'my_orders' ? 'bg-blue-600' : 'hover:bg-slate-800'}`}><ClipboardCheck className="w-5 h-5 mr-3" /> 已承接工單</button></>)}
-                                {currentUserRole === 'ADMIN' && (<><button type="button" onClick={() => setIsTechModalOpen(true)} className="flex items-center w-full px-4 py-3 rounded-lg transition-colors text-slate-300 hover:bg-slate-800"><Users className="w-5 h-5 mr-3" /> 人員管理</button><div className="border-t border-slate-700 my-2 pt-2"><button type="button" onClick={handleSystemBackup} className="flex items-center w-full px-4 py-2 text-sm text-emerald-400 hover:bg-slate-800 rounded-lg"><Download className="w-4 h-4 mr-3" /> 系統備份 (匯出 CSV)</button><label className="flex items-center w-full px-4 py-2 text-sm text-blue-400 hover:bg-slate-800 rounded-lg cursor-pointer"><Upload className="w-4 h-4 mr-3" /> 系統還原 (匯入 CSV)<input type="file" ref={fileInputRef} onChange={handleSystemRestore} className="hidden" accept=".csv" /></label></div></>)}
-                                {(currentUserRole === 'ENGINEER' || currentUserRole === 'ADMIN') && (<button type="button" onClick={() => setIsChangePasswordModalOpen(true)} className="flex items-center w-full px-4 py-3 rounded-lg transition-colors text-slate-300 hover:bg-slate-800"><KeyRound className="w-5 h-5 mr-3" /> 修改密碼</button>)}
-                            </nav>
-                        </div>
-                        <div className="p-4 bg-slate-950 border-t border-slate-800">
-                            <div className="flex items-center gap-3 mb-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${currentUserRole === 'GUEST' ? 'bg-gray-500' : currentUserRole === 'ADMIN' ? 'bg-amber-500' : 'bg-blue-500'}`}>{currentUserRole === 'GUEST' ? 'G' : currentUserRole === 'ADMIN' ? 'A' : 'E'}</div><div><p className="text-sm font-medium">{currentUserRole === 'GUEST' ? '訪客 Guest' : (currentUserRole === 'ADMIN' ? 'Admin' : currentTechName)}</p><p className="text-xs text-slate-400">{currentUserRole === 'GUEST' ? '唯讀模式' : (currentUserRole === 'ADMIN' ? '技術主管' : '技術人員')}</p></div></div>
-                            {currentUserRole === 'GUEST' ? (<button type="button" onClick={() => setIsLoginModalOpen(true)} className="flex items-center justify-center w-full py-2 text-xs text-white bg-slate-700 hover:bg-slate-600 rounded transition-colors mb-2"><LogIn className="w-3 h-3 mr-1" /> 登入系統</button>) : (<button type="button" onClick={handleLogout} className="flex items-center justify-center w-full py-2 text-xs text-slate-400 hover:text-white border border-slate-700 hover:bg-slate-800 rounded transition-colors"><LogOut className="w-3 h-3 mr-1" /> 登出系統</button>)}
-                            {currentUserRole === 'GUEST' && (<button type="button" onClick={handleLogout} className="flex items-center justify-center w-full py-2 text-xs text-slate-400 hover:text-white border border-slate-700 hover:bg-slate-800 rounded transition-colors"><LogOut className="w-3 h-3 mr-1" /> 返回前台</button>)}
-                            <div className="mt-4 text-[10px] text-slate-600 text-center">系統維護 Finn_huang #25619</div>
-                        </div>
+                        <div className="flex-1 overflow-y-auto"><nav className="p-4 space-y-2"><button type="button" onClick={() => setActiveTab('dashboard')} className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-blue-600' : 'hover:bg-slate-800'}`}><LayoutDashboard className="w-5 h-5 mr-3" /> 戰情看板</button>{currentUserRole !== 'GUEST' && (<><button type="button" onClick={() => setActiveTab('list')} className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${activeTab === 'list' ? 'bg-blue-600' : 'hover:bg-slate-800'}`}><ListTodo className="w-5 h-5 mr-3" /> 工單管理</button><button type="button" onClick={() => setActiveTab('my_orders')} className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${activeTab === 'my_orders' ? 'bg-blue-600' : 'hover:bg-slate-800'}`}><ClipboardCheck className="w-5 h-5 mr-3" /> 已承接工單</button></>)}{currentUserRole === 'ADMIN' && (<><button type="button" onClick={() => setIsTechModalOpen(true)} className="flex items-center w-full px-4 py-3 rounded-lg transition-colors text-slate-300 hover:bg-slate-800"><Users className="w-5 h-5 mr-3" /> 人員管理</button><div className="border-t border-slate-700 my-2 pt-2"><button type="button" onClick={handleSystemBackup} className="flex items-center w-full px-4 py-2 text-sm text-emerald-400 hover:bg-slate-800 rounded-lg"><Download className="w-4 h-4 mr-3" /> 系統備份 (CSV)</button><label className="flex items-center w-full px-4 py-2 text-sm text-blue-400 hover:bg-slate-800 rounded-lg cursor-pointer"><Upload className="w-4 h-4 mr-3" /> 系統還原 (CSV)<input type="file" ref={fileInputRef} onChange={handleSystemRestore} className="hidden" accept=".csv" /></label></div></>)}{(currentUserRole === 'ENGINEER' || currentUserRole === 'ADMIN') && (<button type="button" onClick={() => setIsChangePasswordModalOpen(true)} className="flex items-center w-full px-4 py-3 rounded-lg transition-colors text-slate-300 hover:bg-slate-800"><KeyRound className="w-5 h-5 mr-3" /> 修改密碼</button>)}</nav></div>
+                        <div className="p-4 bg-slate-950 border-t border-slate-800"><div className="flex items-center gap-3 mb-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${currentUserRole === 'GUEST' ? 'bg-gray-500' : currentUserRole === 'ADMIN' ? 'bg-amber-500' : 'bg-blue-500'}`}>{currentUserRole === 'GUEST' ? 'G' : currentUserRole === 'ADMIN' ? 'A' : 'E'}</div><div><p className="text-sm font-medium">{currentUserRole === 'GUEST' ? '訪客 Guest' : (currentUserRole === 'ADMIN' ? 'Admin' : currentTechName)}</p><p className="text-xs text-slate-400">{currentUserRole === 'GUEST' ? '唯讀模式' : (currentUserRole === 'ADMIN' ? '技術主管' : '技術人員')}</p></div></div>{currentUserRole === 'GUEST' ? (<button type="button" onClick={() => setIsLoginModalOpen(true)} className="flex items-center justify-center w-full py-2 text-xs text-white bg-slate-700 hover:bg-slate-600 rounded transition-colors mb-2"><LogIn className="w-3 h-3 mr-1" /> 登入系統</button>) : (<button type="button" onClick={handleLogout} className="flex items-center justify-center w-full py-2 text-xs text-slate-400 hover:text-white border border-slate-700 hover:bg-slate-800 rounded transition-colors"><LogOut className="w-3 h-3 mr-1" /> 登出系統</button>)}{currentUserRole === 'GUEST' && (<button type="button" onClick={handleLogout} className="flex items-center justify-center w-full py-2 text-xs text-slate-400 hover:text-white border border-slate-700 hover:bg-slate-800 rounded transition-colors"><LogOut className="w-3 h-3 mr-1" /> 返回前台</button>)}<div className="mt-4 text-[10px] text-slate-600 text-center">系統維護 Finn_huang #25619</div></div>
                     </aside>
-
-                    {/* Main Content */}
                     <main className="flex-1 flex flex-col overflow-hidden">
-                        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm no-print">
-                            {currentUserRole !== 'GUEST' ? (<><div className="flex items-center bg-gray-100 rounded-lg px-3 py-2 w-96"><Search className="w-5 h-5 text-gray-400 mr-2" /><input type="text" placeholder="搜尋工單 (單號、序號、人名)..." className="bg-transparent border-none outline-none text-sm w-full" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /></div><div className="flex items-center gap-4"><button className="p-2 text-gray-400 hover:bg-gray-100 rounded-full relative"><Bell className="w-5 h-5" />{stats.overdue > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>}</button><button onClick={handleExportPDF} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm transition-colors"><FileText size={16} /> 匯出 PDF</button></div></>) : (<div className="flex-1"></div>)}
-                        </header>
-
+                        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm no-print">{currentUserRole !== 'GUEST' ? (<><div className="flex items-center bg-gray-100 rounded-lg px-3 py-2 w-96"><Search className="w-5 h-5 text-gray-400 mr-2" /><input type="text" placeholder="搜尋工單..." className="bg-transparent border-none outline-none text-sm w-full" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /></div><div className="flex items-center gap-4"><button className="p-2 text-gray-400 hover:bg-gray-100 rounded-full relative"><Bell className="w-5 h-5" />{stats.overdue > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>}</button><button onClick={handleExportPDF} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm transition-colors"><FileText size={16} /> 匯出 PDF</button></div></>) : (<div className="flex-1"></div>)}</header>
                         <div className="flex-1 overflow-y-auto p-6" id="dashboard-content">
-                            {activeTab === 'dashboard' && (
-                                <div className="space-y-6">
-                                    <div className="flex justify-between items-end"><h2 className="text-2xl font-bold text-gray-800">戰情看板</h2><div className="text-sm text-gray-400">系統時間: {new Date().toLocaleDateString()}</div></div>
-                                    <div className={`grid grid-cols-1 md:grid-cols-2 ${currentUserRole === 'GUEST' ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-6`}>
-                                        <KPICard title="今日入庫" value={stats.inbound} icon={Truck} colorClass="bg-blue-500" onClick={currentUserRole !== 'GUEST' ? () => handleKPIClick('TODAY') : undefined} />
-                                        <KPICard title="處理中案件" value={stats.wip} icon={Settings} colorClass="bg-indigo-500" onClick={currentUserRole !== 'GUEST' ? () => handleKPIClick('UNFINISHED') : undefined} />
-                                        <KPICard title="本週已完工" value={stats.completed} icon={CheckCircle2} colorClass="bg-emerald-500" onClick={currentUserRole !== 'GUEST' ? () => handleKPIClick('CLOSED') : undefined} />
-                                        {currentUserRole !== 'GUEST' && (<KPICard title="逾期異常" value={stats.overdue} icon={AlertCircle} colorClass="bg-red-500" trend={stats.overdue > 0 ? "需注意" : "狀況良好"} onClick={() => handleKPIClick('OVERDUE')} />)}
-                                    </div>
-                                    {currentUserRole !== 'GUEST' && (
-                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80 lg:col-span-2"><h3 className="mb-4 font-bold text-gray-700">工程師完工績效 (Completed Cases)</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={techPerformanceData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" allowDecimals={false} /><YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12}} /><RechartsTooltip /><Bar isAnimationActive={false} animationDuration={0} dataKey="active" fill="#f59e0b" name="處理中" radius={[0, 4, 4, 0]} barSize={10} /><Bar isAnimationActive={false} animationDuration={0} dataKey="completed" fill="#10b981" name="已完成" radius={[0, 4, 4, 0]} barSize={10} /></BarChart></ResponsiveContainer></div>
-                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80"><h3 className="mb-4 font-bold text-gray-700">各單位送件佔比</h3><ResponsiveContainer width="100%" height="100%"><PieChart><Pie isAnimationActive={false} animationDuration={0} data={chartData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} dataKey="value" label>{chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}</Pie><RechartsTooltip /><Legend /></PieChart></ResponsiveContainer></div>
-                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80"><h3 className="mb-4 font-bold text-gray-700">案件狀態分佈</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={statusData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" /><YAxis dataKey="name" type="category" width={80} tick={{fontSize: 12}} /><RechartsTooltip /><Bar isAnimationActive={false} animationDuration={0} dataKey="count" fill="#4f46e5" radius={[0, 4, 4, 0]} barSize={20} /></BarChart></ResponsiveContainer></div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {currentUserRole !== 'GUEST' && (activeTab === 'list' || activeTab === 'my_orders') && (
-                                <div className="space-y-6">
-                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                        <h2 className="text-2xl font-bold text-gray-800">{activeTab === 'my_orders' ? '已承接工單' : '工單列表'}</h2>
-                                        <div className="flex gap-3">
-                                            <div className="relative">
-                                                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-gray-500 text-sm h-full"><option value="UNFINISHED">未完成 (進行中)</option><option value="READY">待領回</option><option value="CLOSED">已結案</option><option value="ALL">顯示全部</option><option value="TODAY">今日入庫</option><option value="OVERDUE">逾期案件</option><option value="TODAY_DONE">今日完成</option></select>
-                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700"><Filter className="w-4 h-4" /></div>
-                                            </div>
-                                            <button onClick={handleExportCSV} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors shadow-sm"><Download className="w-4 h-4 mr-2" /> 匯出 CSV</button>
-                                            <button onClick={() => setIsAddModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors shadow-sm"><Plus className="w-4 h-4 mr-2" /> 新增工單</button>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                        <table className="w-full text-left">
-                                            <thead className="bg-gray-50 border-b text-gray-500 text-sm"><tr><SortableHeader label="填單時間" sortKey="created_at" /><SortableHeader label="單號 / 狀態" sortKey="case_no" /><SortableHeader label="機台型號 / 優先級" sortKey="machine_model" /><SortableHeader label="來源單位" sortKey="source_dept" /><SortableHeader label="送件人" sortKey="requester_name" /><SortableHeader label="負責人" sortKey="current_owner" /><th className="p-4 font-medium text-right">操作</th></tr></thead>
-                                            <tbody className="divide-y divide-gray-100 text-sm">
-                                                {filteredOrders.length > 0 ? (filteredOrders.map(order => (<tr key={order.id} className={`hover:bg-blue-50 transition-colors ${order.priority === 'URGENT' ? 'bg-red-50 hover:bg-red-100' : ''}`}><td className="p-4 text-gray-600 font-mono text-xs">{formatDateTime(order.created_at)}</td><td className="p-4"><div className="font-bold text-gray-800">{order.case_no}</div><div className="mt-1"><StatusBadge status={order.status} /></div></td><td className="p-4"><div className="font-medium">{order.machine_model}</div><div className="mt-1"><PriorityBadge priority={order.priority || 'NORMAL'} /></div></td><td className="p-4"><div>{order.source_dept}</div></td><td className="p-4"><div className="text-gray-700">{order.requester_name}</div><div className="text-xs text-gray-400">Ext: {order.extension}</div></td><td className="p-4"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs text-gray-600 font-bold">{(order.current_owner || '?')[0]}</div>{order.current_owner}</div></td><td className="p-4 text-right"><button onClick={() => handleOpenDetail(order)} className={`px-3 py-1 rounded border transition-colors text-blue-600 border-blue-200 hover:text-blue-800 hover:bg-blue-100`}>詳情 / 編輯</button></td></tr>))) : (<tr><td colSpan="7" className="p-8 text-center text-gray-400">沒有找到符合的工單</td></tr>)}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
+                            {activeTab === 'dashboard' && (<div className="space-y-6"><div className="flex justify-between items-end"><h2 className="text-2xl font-bold text-gray-800">戰情看板</h2><div className="text-sm text-gray-400">系統時間: {new Date().toLocaleDateString()}</div></div><div className={`grid grid-cols-1 md:grid-cols-2 ${currentUserRole === 'GUEST' ? 'lg:grid-cols-3' : 'lg:grid-cols-5'} gap-6`}><KPICard title="今日入庫" value={stats.inbound} icon={Truck} colorClass="bg-blue-500" onClick={currentUserRole !== 'GUEST' ? () => handleKPIClick('TODAY') : undefined} /><KPICard title="處理中案件" value={stats.wip} icon={Settings} colorClass="bg-indigo-500" onClick={currentUserRole !== 'GUEST' ? () => handleKPIClick('UNFINISHED') : undefined} /><KPICard title="本日已完工" value={stats.completedToday} icon={CheckSquare} colorClass="bg-sky-500" onClick={currentUserRole !== 'GUEST' ? () => handleKPIClick('TODAY_DONE') : undefined} /><KPICard title="本週已完工" value={stats.completed} icon={CheckCircle2} colorClass="bg-emerald-500" onClick={currentUserRole !== 'GUEST' ? () => handleKPIClick('CLOSED') : undefined} />{currentUserRole !== 'GUEST' && (<KPICard title="逾期異常" value={stats.overdue} icon={AlertCircle} colorClass="bg-red-500" trend={stats.overdue > 0 ? "需注意" : "狀況良好"} onClick={() => handleKPIClick('OVERDUE')} />)}</div>{currentUserRole !== 'GUEST' && (<div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80 lg:col-span-2"><h3 className="mb-4 font-bold text-gray-700">本週工程師完成數</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={techPerformanceData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" allowDecimals={false} /><YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12}} /><RechartsTooltip /><Bar isAnimationActive={false} animationDuration={0} dataKey="active" fill="#f59e0b" name="處理中" radius={[0, 4, 4, 0]} barSize={10} /><Bar isAnimationActive={false} animationDuration={0} dataKey="completed" fill="#10b981" name="已完成" radius={[0, 4, 4, 0]} barSize={10} /></BarChart></ResponsiveContainer></div><div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80"><h3 className="mb-4 font-bold text-gray-700">各單位送件佔比</h3><ResponsiveContainer width="100%" height="100%"><PieChart><Pie isAnimationActive={false} animationDuration={0} data={chartData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} dataKey="value" label>{chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}</Pie><RechartsTooltip /><Legend /></PieChart></ResponsiveContainer></div><div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80"><h3 className="mb-4 font-bold text-gray-700">案件狀態分佈</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={statusData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" /><YAxis dataKey="name" type="category" width={80} tick={{fontSize: 12}} /><RechartsTooltip /><Bar isAnimationActive={false} animationDuration={0} dataKey="count" fill="#4f46e5" radius={[0, 4, 4, 0]} barSize={20} /></BarChart></ResponsiveContainer></div></div>)}</div>)}
+                            {currentUserRole !== 'GUEST' && (activeTab === 'list' || activeTab === 'my_orders') && (<div className="space-y-6"><div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"><h2 className="text-2xl font-bold text-gray-800">{activeTab === 'my_orders' ? '已承接工單' : '工單列表'}</h2><div className="flex gap-3"><div className="relative"><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-gray-500 text-sm h-full"><option value="UNFINISHED">未完成 (進行中)</option><option value="READY">待領回</option><option value="CLOSED">已結案</option><option value="ALL">顯示全部</option><option value="TODAY">今日入庫</option><option value="OVERDUE">逾期案件</option><option value="TODAY_DONE">今日完成</option></select><div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700"><Filter className="w-4 h-4" /></div></div><button onClick={handleExportCSV} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors shadow-sm"><Download className="w-4 h-4 mr-2" /> 匯出 CSV</button><button onClick={() => setIsAddModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors shadow-sm"><Plus className="w-4 h-4 mr-2" /> 新增工單</button></div></div><div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"><table className="w-full text-left"><thead className="bg-gray-50 border-b text-gray-500 text-sm"><tr><SortableHeader label="填單時間" sortKey="created_at" /><SortableHeader label="單號 / 狀態" sortKey="case_no" /><SortableHeader label="機台型號 / 優先級" sortKey="machine_model" /><SortableHeader label="來源單位" sortKey="source_dept" /><SortableHeader label="送件人" sortKey="requester_name" /><SortableHeader label="負責人" sortKey="current_owner" /><th className="p-4 font-medium text-right">操作</th></tr></thead><tbody className="divide-y divide-gray-100 text-sm">{filteredOrders.length > 0 ? (filteredOrders.map(order => (<tr key={order.id} className={`hover:bg-blue-50 transition-colors ${order.priority === 'URGENT' ? 'bg-red-50 hover:bg-red-100' : ''}`}><td className="p-4 text-gray-600 font-mono text-xs">{formatDateTime(order.created_at)}</td><td className="p-4"><div className="font-bold text-gray-800">{order.case_no}{order.inbound_date === getLocalYYYYMMDD() && <NewBadge />}</div><div className="mt-1"><StatusBadge status={order.status} /></div></td><td className="p-4"><div className="font-medium">{order.machine_model}</div><div className="mt-1"><PriorityBadge priority={order.priority || 'NORMAL'} /></div></td><td className="p-4"><div>{order.source_dept}</div></td><td className="p-4"><div className="text-gray-700">{order.requester_name}</div><div className="text-xs text-gray-400">Ext: {order.extension}</div></td><td className="p-4"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs text-gray-600 font-bold">{(order.current_owner || '?')[0]}</div>{order.current_owner}</div></td><td className="p-4 text-right"><button onClick={() => handleOpenDetail(order)} className={`px-3 py-1 rounded border transition-colors text-blue-600 border-blue-200 hover:text-blue-800 hover:bg-blue-100`}>詳情 / 編輯</button></td></tr>))) : (<tr><td colSpan="7" className="p-8 text-center text-gray-400">沒有找到符合的工單</td></tr>)}</tbody></table></div></div>)}
                         </div>
                     </main>
-                    
-                    {/* 詳細 / 編輯 Modal */}
+
+                    {/* All Modals for Admin/Eng/Guest */}
                     <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title="工單詳情與維護">
                         {editForm && (
                             <div className="space-y-6">
@@ -853,8 +487,32 @@
                     <Modal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} title="後台管理登入">
                         <form onSubmit={handleLogin} className="space-y-6">
                             <div className="space-y-4">
-                                <div className="space-y-1"><label className="text-sm font-medium text-gray-700">帳號 (Username)</label><div className="relative"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><User size={18} /></div><input type="text" value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} className="pl-10 w-full border border-gray-300 rounded-lg py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="請輸入帳號" required /></div></div>
-                                <div className="space-y-1"><label className="text-sm font-medium text-gray-700">密碼 (Password)</label><div className="relative"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><Lock size={18} /></div><input type="password" value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} className="pl-10 w-full border border-gray-300 rounded-lg py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="請輸入密碼" required /></div></div>
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-700">選擇身分 (Identity)</label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><User size={18} /></div>
+                                        <select 
+                                            value={loginForm.username} 
+                                            onChange={(e) => setLoginForm({...loginForm, username: e.target.value})} 
+                                            className="pl-10 w-full border border-gray-300 rounded-lg py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+                                            required
+                                        >
+                                            <option value="" disabled>請選擇人員</option>
+                                            <option value="25619">👑 管理者 (Admin)</option>
+                                            {technicians.map(t => (
+                                                <option key={t.id || t.username} value={t.username}>{t.name}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500"><ChevronDown size={16} /></div>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-700">密碼 (Password)</label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><Lock size={18} /></div>
+                                        <input type="password" value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})} className="pl-10 w-full border border-gray-300 rounded-lg py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="請輸入密碼" required />
+                                    </div>
+                                </div>
                             </div>
                             <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg">登入</button>
                         </form>
